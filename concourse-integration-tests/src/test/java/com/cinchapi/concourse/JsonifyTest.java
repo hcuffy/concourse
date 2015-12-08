@@ -39,7 +39,7 @@ public class JsonifyTest extends ConcourseIntegrationTest {
         client.add("key", 3.14, 1);
         client.add("key", Link.to(12345), 2);
         Assert.assertTrue(client.jsonify(1).contains("3.14D"));
-        Assert.assertTrue(client.jsonify(2).contains("@12345@"));
+        Assert.assertTrue(client.jsonify(2).contains("@12345"));
     }
 
     @Test
@@ -47,9 +47,8 @@ public class JsonifyTest extends ConcourseIntegrationTest {
         String testStr = "{\"key1\": a, \"key2\": b, \"key3\": [c, d, e]}";
         client.insert(testStr, 10L);
         String resultStr = client.jsonify(10L);
-
-        Assert.assertTrue(resultStr.contains("\"key1\":[\"a\"]"));
-        Assert.assertTrue(resultStr.contains("\"key2\":[\"b\"]"));
+        Assert.assertTrue(resultStr.contains("\"key1\":\"a\""));
+        Assert.assertTrue(resultStr.contains("\"key2\":\"b\""));
         Assert.assertTrue(resultStr.contains("\"key3\":[\"d\",\"e\",\"c\"]"));
     }
 

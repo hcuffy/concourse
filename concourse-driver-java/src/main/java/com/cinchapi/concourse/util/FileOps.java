@@ -22,12 +22,14 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.AbstractList;
 import java.util.Iterator;
 import java.util.List;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Throwables;
+import com.google.common.io.Files;
 
 /**
  * Generic file utility methods that compliment and expand upon those found in
@@ -36,6 +38,22 @@ import com.google.common.base.Throwables;
  * @author Jeff Nelson
  */
 public class FileOps {
+
+    /**
+     * Write the String {@code content} to the end of the {@code file},
+     * preserving anything that was previously there.
+     * 
+     * @param content the data to write
+     * @param file the path to the file
+     */
+    public static void append(String content, String file) {
+        try {
+            Files.append(content, new File(file), StandardCharsets.UTF_8);
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
+    }
 
     /**
      * Expand the given {@code path} so that it contains completely normalized
@@ -82,6 +100,17 @@ public class FileOps {
      */
     public static String getWorkingDirectory() {
         return WORKING_DIRECTORY;
+    }
+
+    /**
+     * Return {@code true} if the specified {@code path} is that of a directory
+     * and not a flat file.
+     * 
+     * @param path the path to check
+     * @return {@code true} if the {@code path} is that of a directory
+     */
+    public static boolean isDirectory(String path) {
+        return java.nio.file.Files.isDirectory(Paths.get(path));
     }
 
     /**
@@ -190,6 +219,40 @@ public class FileOps {
             }
 
         };
+    }
+
+    /**
+     * Create an empty file or update the last updated timestamp on the same as
+     * the unix command of the same name.
+     * 
+     * @param file the path of the file to touch
+     * @return the value of {@code file} in case it needs to be passed to a
+     *         super constructor
+     */
+    public static String touch(String file) {
+        try {
+            Files.touch(new File(file));
+            return file;
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
+    }
+
+    /**
+     * Write the String {@code content} to the {@code file}, overwriting
+     * anything that was previously there.
+     * 
+     * @param content the data to write
+     * @param file the path to the file
+     */
+    public static void write(String content, String file) {
+        try {
+            Files.write(content, new File(file), StandardCharsets.UTF_8);
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
     }
 
     protected FileOps() {/* noop */}

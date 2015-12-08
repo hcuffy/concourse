@@ -15,11 +15,14 @@
  */
 package com.cinchapi.concourse.util;
 
+import java.io.IOException;
+import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map.Entry;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import javax.annotation.concurrent.Immutable;
@@ -33,15 +36,15 @@ import com.cinchapi.concourse.thrift.Operator;
 import com.cinchapi.concourse.thrift.TObject;
 import com.cinchapi.concourse.thrift.Type;
 import com.google.common.base.Objects;
+import com.google.common.base.Throwables;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.google.common.primitives.Longs;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
-import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 
 /**
  * A collection of functions to convert objects. The public API defined in
@@ -65,16 +68,26 @@ public final class Convert {
      */
     public static List<Multimap<String, Object>> anyJsonToJava(String json) {
         List<Multimap<String, Object>> result = Lists.newArrayList();
-        JsonElement top = JSON_PARSER.parse(json);
-        if(top.isJsonArray()) {
-            JsonArray array = (JsonArray) top;
-            Iterator<JsonElement> it = array.iterator();
-            while (it.hasNext()) {
-                result.add(jsonToJava(it.next().toString()));
+        try (JsonReader reader = new JsonReader(new StringReader(json))) {
+            reader.setLenient(true);
+            if(reader.peek() == JsonToken.BEGIN_ARRAY) {
+                try {
+                    reader.beginArray();
+                    while (reader.peek() != JsonToken.END_ARRAY) {
+                        result.add(jsonToJava(reader));
+                    }
+                    reader.endArray();
+                }
+                catch (IllegalStateException e) {
+                    throw new JsonParseException(e.getMessage());
+                }
+            }
+            else {
+                result.add(jsonToJava(reader));
             }
         }
-        else {
-            result.add(jsonToJava(top.toString()));
+        catch (IOException e) {
+            throw Throwables.propagate(e);
         }
         return result;
     }
@@ -152,46 +165,75 @@ public final class Convert {
      * @return the converted data
      */
     public static Multimap<String, Object> jsonToJava(String json) {
-        // NOTE: in this method we use the #toString instead of the #getAsString
-        // method of each JsonElement to trigger the conversion to a java
-        // primitive to ensure that quotes are taken into account and we
-        // properly convert strings masquerading as numbers (e.g. "3").
-        Multimap<String, Object> data = HashMultimap.create();
-        JsonParser parser = new JsonParser();
-        JsonElement top = parser.parse(json);
-        if(!top.isJsonObject()) {
-            throw new JsonParseException(
-                    "The JSON string must encapsulate data within an object");
+        try (JsonReader reader = new JsonReader(new StringReader(json))) {
+            reader.setLenient(true);
+            return jsonToJava(reader);
         }
-        JsonObject object = (JsonObject) parser.parse(json);
-        for (Entry<String, JsonElement> entry : object.entrySet()) {
-            String key = entry.getKey();
-            JsonElement val = entry.getValue();
-            if(val.isJsonArray()) {
-                // If we have an array, add the elements individually. If there
-                // are any duplicates in the array, they will be filtered out by
-                // virtue of the fact that a HashMultimap does not store
-                // dupes.
-                Iterator<JsonElement> it = val.getAsJsonArray().iterator();
-                while (it.hasNext()) {
-                    JsonElement elt = it.next();
-                    if(elt.isJsonPrimitive()) {
-                        Object value = jsonElementToJava(elt);
-                        data.put(key, value);
-                    }
-                    else {
-                        throw new JsonParseException(
-                                "Cannot parse a non-primitive "
-                                        + "element inside of an array");
-                    }
-                }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
+    }
+
+    /**
+     * Serialize the {@link list} of {@link Multimap maps} with data to a JSON
+     * string that can be batch inserted into Concourse.
+     * 
+     * @param list the list of data {@link Multimap maps} to include in the JSON
+     *            object. This is meant to map to the return value of
+     *            {@link #anyJsonToJava(String)}
+     * @return the JSON string representation of the {@code list}
+     */
+    @SuppressWarnings("unchecked")
+    public static String mapsToJson(Collection<Multimap<String, Object>> list) {
+        // GH-116: The signature declares that the list should contain Multimap
+        // instances, but we check the type of each element in case the data is
+        // coming from a JVM dynamic language (i.e. Groovy) that has syntactic
+        // sugar for a java.util.Map
+        StringBuilder sb = new StringBuilder();
+        sb.append('[');
+        for (Object map : list) {
+            if(map instanceof Multimap) {
+                Multimap<String, Object> map0 = (Multimap<String, Object>) map;
+                sb.append(mapToJson(map0));
+                sb.append(",");
+            }
+            else if(map instanceof Map) {
+                Map<String, Object> map0 = (Map<String, Object>) map;
+                sb.append(mapToJson(map0));
+                sb.append(",");
             }
             else {
-                Object value = jsonElementToJava(val);
-                data.put(key, value);
+                ((Multimap<String, Object>) map).getClass(); // force
+                                                             // ClassCastException
+                                                             // to be thrown
             }
+
         }
-        return data;
+        sb.setCharAt(sb.length() - 1, ']');
+        return sb.toString();
+    }
+
+    /**
+     * Serialize the {@code map} of data as a JSON object string that can be
+     * inserted into Concourse.
+     * 
+     * @param map data to include in the JSON object.
+     * @return the JSON string representation of the {@code map}
+     */
+    public static String mapToJson(Map<String, ?> map) {
+        return DataServices.gson().toJson(map);
+    }
+
+    /**
+     * Serialize the {@code map} of a data as a JSON string that can inserted
+     * into Concourse.
+     * 
+     * @param map the data to include in the JSON object. This is meant to map
+     *            to the return value of {@link #jsonToJava(String)}
+     * @return the JSON string representation of the {@code map}
+     */
+    public static String mapToJson(Multimap<String, Object> map) {
+        return mapToJson(map.asMap());
     }
 
     /**
@@ -275,9 +317,7 @@ public final class Convert {
             return value.substring(1, value.length() - 1);
         }
         else if(first == '@'
-                && last == '@'
-                && (record = Longs.tryParse(value.substring(1,
-                        value.length() - 1))) != null) {
+                && (record = Longs.tryParse(value.substring(1, value.length()))) != null) {
             return Link.to(record);
         }
         else if(first == '@' && last == '@'
@@ -301,12 +341,12 @@ public final class Convert {
     }
 
     /**
-     * Convert the {@code symbol} to the corresponding {@link Operator}.
-     * These include strings such as (=, >, >=, etc), and CaSH symbols (eq, gt,
-     * gte, etc).
+     * Convert the {@code symbol} into the appropriate {@link Operator}.
      * 
-     * @param symbol
-     * @return
+     * @param symbol - the string form of a symbol (i.e. =, >, >=, etc) or a
+     *            CaSH shortcut (i.e. eq, gt, gte, etc)
+     * @return the {@link Operator} that is parsed from the string
+     *         {@code symbol}
      */
     public static Operator stringToOperator(String symbol) {
         switch (symbol.toLowerCase()) {
@@ -352,12 +392,16 @@ public final class Convert {
 
     /**
      * <p>
+     * Users are encouraged to use {@link Link#toWhere(String)} instead of this
+     * method.
+     * </p>
+     * <p>
      * <strong>USE WITH CAUTION: </strong> This conversation is only necessary
-     * for applications that import raw data but cannot use the Concourse API
-     * directly and therefore cannot explicitly add links (e.g. the
-     * import-framework that handles raw string data). <strong>
-     * <em>If you have access to the Concourse API, you should not use this 
-     * method!</em> </strong>
+     * when bulk inserting data in string form (i.e. importing data from a CSV
+     * file) that should have static links dynamically resolved.<strong>
+     * <em>Unless you are certain otherwise, you should never need to use this 
+     * method because there is probably some intermediate function or framework 
+     * that does this for you!</em></strong>
      * </p>
      * <p>
      * Convert the {@code ccl} string to a {@link ResolvableLink} instruction
@@ -453,22 +497,112 @@ public final class Convert {
     }
 
     /**
-     * Convert a {@link JsonElement} to a a Java object and respect the desire
-     * to force a numeric string to a double.
+     * Convert the next JSON object in the {@code reader} to a mapping that
+     * associates each key with the Java objects that represent the
+     * corresponding values.
      * 
-     * @param element
-     * @return the java object
+     * <p>
+     * This method has the same rules and limitations as
+     * {@link #jsonToJava(String)}. It simply uses a {@link JsonReader} to
+     * handle reading an array of objects.
+     * </p>
+     * <p>
+     * <strong>This method DOES NOT {@link JsonReader#close()} the
+     * {@code reader}.</strong>
+     * </p>
+     * 
+     * @param reader the {@link JsonReader} that contains a stream of JSON
+     * @return the JSON data in the form of a {@link Multimap} from keys to
+     *         values
      */
-    private static Object jsonElementToJava(JsonElement element) {
-        String asString = element.getAsString();
-        if(element.isJsonPrimitive()
-                && element.getAsJsonPrimitive().isString()
-                && (Strings.tryParseNumberStrict(asString) != null || Strings
-                        .tryParseBoolean(asString) != null)) {
-            return asString;
+    private static Multimap<String, Object> jsonToJava(JsonReader reader) {
+        Multimap<String, Object> data = HashMultimap.create();
+        try {
+            reader.beginObject();
+            JsonToken peek0;
+            while ((peek0 = reader.peek()) != JsonToken.END_OBJECT) {
+                String key = reader.nextName();
+                peek0 = reader.peek();
+                if(peek0 == JsonToken.BEGIN_ARRAY) {
+                    // If we have an array, add the elements individually. If
+                    // there are any duplicates in the array, they will be
+                    // filtered out by virtue of the fact that a HashMultimap
+                    // does not store dupes.
+                    reader.beginArray();
+                    JsonToken peek = reader.peek();
+                    do {
+                        Object value;
+                        if(peek == JsonToken.BOOLEAN) {
+                            value = reader.nextBoolean();
+                        }
+                        else if(peek == JsonToken.NUMBER) {
+                            value = stringToJava(reader.nextString());
+                        }
+                        else if(peek == JsonToken.STRING) {
+                            String orig = reader.nextString();
+                            value = stringToJava(orig);
+                            // If the token looks like a string, it MUST be
+                            // converted to a Java string unless it is a
+                            // masquerading double or an instance of Thrift
+                            // translatable class that has a special string
+                            // representation (i.e. Tag, Link)
+                            if(orig.charAt(orig.length() - 1) != 'D'
+                                    && !CLASSES_WITH_ENCODED_STRING_REPR
+                                            .contains(value.getClass())) {
+                                value = value.toString();
+                            }
+                        }
+                        else if(peek == JsonToken.NULL) {
+                            reader.skipValue();
+                            continue;
+                        }
+                        else {
+                            throw new JsonParseException(
+                                    "Cannot parse nested object or array within an array");
+                        }
+                        data.put(key, value);
+                    }
+                    while ((peek = reader.peek()) != JsonToken.END_ARRAY);
+                    reader.endArray();
+                }
+                else {
+                    Object value;
+                    if(peek0 == JsonToken.BOOLEAN) {
+                        value = reader.nextBoolean();
+                    }
+                    else if(peek0 == JsonToken.NUMBER) {
+                        value = stringToJava(reader.nextString());
+                    }
+                    else if(peek0 == JsonToken.STRING) {
+                        String orig = reader.nextString();
+                        value = stringToJava(orig);
+                        // If the token looks like a string, it MUST be
+                        // converted to a Java string unless it is a
+                        // masquerading double or an instance of Thrift
+                        // translatable class that has a special string
+                        // representation (i.e. Tag, Link)
+                        if(orig.charAt(orig.length() - 1) != 'D'
+                                && !CLASSES_WITH_ENCODED_STRING_REPR
+                                        .contains(value.getClass())) {
+                            value = value.toString();
+                        }
+                    }
+                    else if(peek0 == JsonToken.NULL) {
+                        reader.skipValue();
+                        continue;
+                    }
+                    else {
+                        throw new JsonParseException(
+                                "Cannot parse nested object to value");
+                    }
+                    data.put(key, value);
+                }
+            }
+            reader.endObject();
+            return data;
         }
-        else {
-            return stringToJava(asString);
+        catch (IOException | IllegalStateException e) {
+            throw new JsonParseException(e.getMessage());
         }
     }
 
@@ -491,12 +625,6 @@ public final class Convert {
                                                                   // testing
 
     /**
-     * A parser to convert JSON documents represented as Strings to
-     * {@link JsonElement json elements}.
-     */
-    private static final JsonParser JSON_PARSER = new JsonParser();
-
-    /**
      * A {@link Pattern} that can be used to determine whether a string matches
      * the expected pattern of an instruction to insert links to records that
      * are resolved by finding matches to a criteria.
@@ -507,12 +635,21 @@ public final class Convert {
     private static final Pattern STRING_RESOLVABLE_LINK_REGEX = Pattern
             .compile("^@(?=.*[ ]).+@$");
 
+    /**
+     * These classes have a special encoding that signals that string value
+     * should actually be converted to those instances in
+     * {@link #stringToJava(String)}.
+     */
+    @SuppressWarnings("unchecked")
+    private static Set<Class<?>> CLASSES_WITH_ENCODED_STRING_REPR = Sets
+            .newHashSet(Link.class, Tag.class, ResolvableLink.class);
+
     private Convert() {/* Utility Class */}
 
     /**
-     * A special class that is used to indicate that the record to which a Link
-     * should point must be resolved by finding all records that match a
-     * criteria.
+     * A special class that is used to indicate that the record(s) to which one
+     * or more {@link Link links} should point must be resolved by finding all
+     * records that match a criteria.
      * <p>
      * This class is NOT part of the public API, so it should not be used as a
      * value for input to the client. Objects of this class exist merely to
@@ -632,8 +769,8 @@ public final class Convert {
 
         @Override
         public String toString() {
-            return Strings.joinWithSpace(this.getClass().getSimpleName(),
-                    "for", ccl);
+            return Strings.format("{} for {}", this.getClass().getSimpleName(),
+                    ccl);
         }
 
     }

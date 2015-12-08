@@ -18,9 +18,7 @@ package com.cinchapi.concourse;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import javax.annotation.concurrent.ThreadSafe;
-
 import com.cinchapi.concourse.config.ConcourseClientPreferences;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -369,7 +367,7 @@ public abstract class ConnectionPool implements AutoCloseable {
 
     @Override
     public void close() throws Exception {
-        Preconditions.checkState(isCloseable(),
+        Preconditions.checkState(isClosable(),
                 "Cannot shutdown the connection pool "
                         + "until all the connections have been returned");
         if(open.compareAndSet(true, false)) {
@@ -435,6 +433,17 @@ public abstract class ConnectionPool implements AutoCloseable {
     protected abstract Queue<Concourse> buildQueue(int size);
 
     /**
+     * Force the connection pool to close regardless of whether it is or is not
+     * in a {@link #isClosable() closable} state.
+     */
+    protected void forceClose(){
+        if(open.compareAndSet(true, false)) {
+            exitConnections(available);
+            exitConnections(leased);
+        }
+    }
+
+    /**
      * Get a connection from the queue of {@code available} ones. The subclass
      * should use the correct method depending upon whether this method should
      * block or not.
@@ -467,6 +476,11 @@ public abstract class ConnectionPool implements AutoCloseable {
                     exited = true;
                 }
                 catch (Exception e) {
+                    // If a shutdown hook is used to close the connection pool,
+                    // its possible to run into a situation where multiple
+                    // threads operating on a client connection may trigger an
+                    // out-of-sequence error with Thrift. If that is the case,
+                    // keep retrying...
                     exited = false;
                 }
             }
@@ -479,7 +493,7 @@ public abstract class ConnectionPool implements AutoCloseable {
      * 
      * @return {@code true} if the pool can be closed
      */
-    private boolean isCloseable() {
+    private boolean isClosable() {
         return leased.isEmpty();
     }
 
@@ -502,7 +516,7 @@ public abstract class ConnectionPool implements AutoCloseable {
                     "Cannot release the connection because it "
                             + "was not previously requested from this pool");
         }
-    }
+  
 
     /**
      * Force closes the connection pool whether or not

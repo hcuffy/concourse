@@ -30,6 +30,7 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.List;
@@ -47,7 +48,9 @@ import jline.TerminalFactory;
 
 import com.cinchapi.concourse.Concourse;
 import com.cinchapi.concourse.DuplicateEntryException;
+import com.cinchapi.concourse.Link;
 import com.cinchapi.concourse.Timestamp;
+import com.cinchapi.concourse.config.ConcourseClientPreferences;
 import com.cinchapi.concourse.config.ConcourseServerPreferences;
 import com.cinchapi.concourse.lang.Criteria;
 import com.cinchapi.concourse.lang.Symbol;
@@ -61,11 +64,13 @@ import org.slf4j.LoggerFactory;
 import ch.qos.logback.classic.Level;
 
 import com.cinchapi.concourse.util.ConcourseServerDownloader;
+import com.cinchapi.concourse.util.FileOps;
 import com.cinchapi.concourse.util.Processes;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * A {@link ManagedConcourseServer} is an external server process that can be
@@ -90,7 +95,7 @@ public class ManagedConcourseServer {
     }
 
     /**
-     * Create an {@link ManagedConcourseServer from the {@code installer}.
+     * Create an {@link ManagedConcourseServer} from the {@code installer}.
      * 
      * @param installer
      * @return the ManagedConcourseServer
@@ -246,6 +251,12 @@ public class ManagedConcourseServer {
             process = Runtime.getRuntime().exec("ls " + application);
             List<String> output = Processes.getStdOut(process);
             if(!output.isEmpty()) {
+                Files.deleteIfExists(Paths.get(application,
+                        "conf/concourse.prefs.dev")); // delete the dev prefs
+                                                      // because those would
+                                                      // take precedence over
+                                                      // what is configured
+                                                      // in this class
                 configure(application);
                 log.info("Successfully installed server in {}", application);
                 return application;
@@ -309,6 +320,14 @@ public class ManagedConcourseServer {
      * created.
      */
     private static final String TARGET_BINARY_NAME = "concourse-server.bin";
+
+    /**
+     * A flag that determines how the concourse_client.prefs file should be
+     * handled when this server is {@link #destroy() destroyed}. Generally,
+     * nothing is done to the prefs file unless
+     * {@link #syncDefaultClientConnectionInfo()} was called by the client.
+     */
+    private ClientPrefsCleanupAction clientPrefsCleanupAction = ClientPrefsCleanupAction.NONE;
 
     /**
      * The server application install directory;
@@ -379,6 +398,20 @@ public class ManagedConcourseServer {
                 stop();
             }
             try {
+                Path prefs = Paths.get("concourse_client.prefs")
+                        .toAbsolutePath();
+                if(clientPrefsCleanupAction == ClientPrefsCleanupAction.RESTORE_BACKUP) {
+                    Path backup = Paths.get("concourse_client.prefs.bak")
+                            .toAbsolutePath();
+                    Files.move(backup, prefs,
+                            StandardCopyOption.REPLACE_EXISTING);
+                    log.info("Restored original client prefs from {} to {}",
+                            backup, prefs);
+                }
+                else if(clientPrefsCleanupAction == ClientPrefsCleanupAction.DELETE) {
+                    Files.delete(prefs);
+                    log.info("Deleted client prefs from {}", prefs);
+                }
                 deleteDirectory(Paths.get(installDirectory).getParent()
                         .toString());
                 log.info("Deleted server install directory at {}",
@@ -478,6 +511,30 @@ public class ManagedConcourseServer {
     }
 
     /**
+     * Print the content of the log files for each of the log {@code levels} to
+     * the console.
+     * 
+     * @param levels the log levels to print
+     */
+    public void printLogs(LogLevel... levels) {
+        // NOTE: This method does not currently print contents of archived log
+        // files. This is intentional because we assume that any interesting log
+        // information that needs to be printed will be in the most recent file.
+        String logdir = Paths.get(installDirectory, "log").toString();
+        for (LogLevel level : levels) {
+            String name = level.name().toLowerCase();
+            String file = Paths.get(logdir, name + ".log").toString();
+            String content = FileOps.read(file);
+            System.out.println(file);
+            for (int i = 0; i < file.length(); ++i) {
+                System.out.print('-');
+            }
+            System.out.println();
+            System.out.println(content);
+        }
+    }
+
+    /**
      * Start the server.
      */
     public void start() {
@@ -505,6 +562,53 @@ public class ManagedConcourseServer {
             throw Throwables.propagate(e);
         }
 
+    }
+
+    /**
+     * Copy the connection information for this managed server to a
+     * {@code concourse_client.prefs} file located in the root of the working
+     * directory so that source code relying on the default connection behaviour
+     * will properly connect to this server.
+     * <p>
+     * A test case that uses an indirect connection to Concourse (i.e. the test
+     * case doesn't directly use the provided {@code client} variable provided
+     * by the framework, but uses classes from the application source code that
+     * has its own mechanism for connecting to Concourse) SHOULD call this
+     * method so that the application code will connect to the this server for
+     * the purpose of the unit test.
+     * </p>
+     * <p>
+     * Any connection information that is synchronized will be cleaned up after
+     * the test. If a prefs file already existed in the root of the working
+     * directory, that file is backed up and restored so that the application
+     * can run normally outside of the test cases.
+     * </p>
+     */
+    public void syncDefaultClientConnectionInfo() {
+        try {
+            Path prefs = Paths.get("concourse_client.prefs").toAbsolutePath();
+            if(Files.exists(prefs)) {
+                Path backup = Paths.get("concourse_client.prefs.bak")
+                        .toAbsolutePath();
+                Files.move(prefs, backup);
+                clientPrefsCleanupAction = ClientPrefsCleanupAction.RESTORE_BACKUP;
+                log.info("Took backup for client prefs file located at {}. "
+                        + "The backup is stored in {}", prefs, backup);
+            }
+            else {
+                clientPrefsCleanupAction = ClientPrefsCleanupAction.DELETE;
+            }
+            log.info("Synchronizing the managed server's connection "
+                    + "information to the client prefs file at {}", prefs);
+            ConcourseClientPreferences ccp = ConcourseClientPreferences
+                    .open(FileOps.touch(prefs.toString()));
+            ccp.setPort(getClientPort());
+            ccp.setUsername("admin");
+            ccp.setPassword("admin".toCharArray());
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
     }
 
     /**
@@ -576,6 +680,15 @@ public class ManagedConcourseServer {
     }
 
     /**
+     * The valid options for the {@link #clientPrefsCleanupAction} variable.
+     * 
+     * @author Jeff Nelson
+     */
+    enum ClientPrefsCleanupAction {
+        DELETE, NONE, RESTORE_BACKUP
+    }
+
+    /**
      * A {@link Concourse} client wrapper that delegates to the jars located in
      * the server's lib directory so that it uses the same version of the code.
      * 
@@ -629,15 +742,15 @@ public class ManagedConcourseServer {
         }
 
         @Override
+        public <T> long add(String key, T value) {
+            return invoke("add", String.class, Object.class).with(key, value);
+        }
+
+        @Override
         public <T> Map<Long, Boolean> add(String key, T value,
                 Collection<Long> records) {
             return invoke("add", String.class, Object.class, Collection.class)
                     .with(key, value, records);
-        }
-
-        @Override
-        public <T> long add(String key, T value) {
-            return invoke("add", String.class, Object.class).with(key, value);
         }
 
         @Override
@@ -776,11 +889,6 @@ public class ManagedConcourseServer {
         }
 
         @Override
-        public long create() {
-            return invoke("create").with();
-        }
-
-        @Override
         public Map<Long, Set<String>> describe(Collection<Long> records) {
             return invoke("describe", Collection.class).with(records);
         }
@@ -861,7 +969,7 @@ public class ManagedConcourseServer {
 
         @Override
         public Set<Long> find(String ccl) {
-            return invoke("find", String.class, Object.class).with(ccl);
+            return invoke("find", String.class).with(ccl);
         }
 
         @Override
@@ -1649,15 +1757,59 @@ public class ManagedConcourseServer {
                             continue;
                         }
                     }
-                    return (T) method.invoke(delegate, args);
+                    return (T) transformServerObject(method.invoke(delegate,
+                            args));
                 }
                 catch (Exception e) {
                     throw Throwables.propagate(e);
                 }
             }
 
+            /**
+             * If necessary, given an {@code object} returned from the managed
+             * server, transform it to a class that comes from the test
+             * application's classpath.
+             * 
+             * @param object the object from the managed server (usually a
+             *            method's
+             *            return value)
+             * @return the transformed object
+             * @throws ReflectiveOperationException
+             */
+            private Object transformServerObject(Object object)
+                    throws ReflectiveOperationException {
+                if(object == null) {
+                    return object;
+                }
+                else if(object instanceof Set) {
+                    Set<Object> transformed = Sets.newLinkedHashSet();
+                    for (Object item : (Set<?>) object) {
+                        transformed.add(transformServerObject(item));
+                    }
+                    object = transformed;
+                }
+                else if(object.getClass().getSimpleName()
+                        .equals(Link.class.getSimpleName())) {
+                    long longValue = (long) loader
+                            .loadClass(packageBase + Link.class.getSimpleName())
+                            .getMethod("longValue").invoke(object);
+                    object = Link.to(longValue);
+                }
+                return object;
+            }
+
         }
 
+    }
+
+    /**
+     * Enum for log levels that can be passed to the
+     * {@link #printLogs(LogLevel...)} method
+     * 
+     * @author Jeff Nelson
+     */
+    public enum LogLevel {
+        DEBUG, INFO, WARN, ERROR, CONSOLE
     }
 
 }

@@ -19,7 +19,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Assert;
 import org.junit.Test;
+<<<<<<< HEAD
 
+=======
+import com.cinchapi.concourse.Concourse;
+import com.cinchapi.concourse.Timestamp;
+import com.cinchapi.concourse.TransactionException;
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
 import com.cinchapi.concourse.lang.Criteria;
 import com.cinchapi.concourse.test.ConcourseIntegrationTest;
 import com.cinchapi.concourse.thrift.Operator;
@@ -423,7 +429,11 @@ public class TransactionWorkflowTest extends ConcourseIntegrationTest {
     }
 
     @Test
+<<<<<<< HEAD
     public void testStageCommit() {
+=======
+    public void testStageRunnableCommit() {
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
 
         boolean committed = client.stage(new Runnable() {
 
@@ -438,13 +448,25 @@ public class TransactionWorkflowTest extends ConcourseIntegrationTest {
         Assert.assertTrue(committed);
         Assert.assertEquals("Ron", client.get("name", 1));
         Assert.assertEquals("Stacy", client.get("name", 2));
+<<<<<<< HEAD
+=======
+        Assert.assertEquals("Ron", client2.get("name", 1));
+        Assert.assertEquals("Stacy", client2.get("name", 2));
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
 
     }
 
     @Test
+<<<<<<< HEAD
     public void testStageThreadConfilct() throws InterruptedException {
 
         final AtomicBoolean t1Go = new AtomicBoolean(false);
+=======
+    public void testStageRunnableFailsOnConfilct() throws InterruptedException {
+
+        final AtomicBoolean t1Go = new AtomicBoolean(false);
+        final AtomicBoolean t2Go = new AtomicBoolean(false);
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
         final AtomicBoolean committed = new AtomicBoolean(true);
         Thread t1 = new Thread(new Runnable() {
 
@@ -454,18 +476,28 @@ public class TransactionWorkflowTest extends ConcourseIntegrationTest {
                     committed.set(client.stage(new Runnable() {
                         public void run() {
                             client.add("name", "Ron", 1);
+<<<<<<< HEAD
                             while (!t1Go.get()) {
 
                                 continue;
                             }
 
+=======
+                            t2Go.set(true);
+                            while (!t1Go.get()) {
+                                continue;
+                            }
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
                         }
 
                     }));
                 }
                 catch (TransactionException e) {
                     committed.set(false);
+<<<<<<< HEAD
 
+=======
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
                 }
             }
         });
@@ -474,9 +506,17 @@ public class TransactionWorkflowTest extends ConcourseIntegrationTest {
 
             @Override
             public void run() {
+<<<<<<< HEAD
                 client2.add("name", "Bron", 1);
                 t1Go.set(true);
 
+=======
+                while (!t2Go.get()) {
+                    continue;
+                }
+                client2.add("name", "Bron", 1);
+                t1Go.set(true);
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
             }
 
         });

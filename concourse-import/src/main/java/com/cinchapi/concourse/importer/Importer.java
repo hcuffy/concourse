@@ -17,9 +17,8 @@ package com.cinchapi.concourse.importer;
 
 import java.util.Set;
 
-import org.slf4j.LoggerFactory;
-
-import ch.qos.logback.classic.Logger;
+import javax.annotation.Nullable;
+import javax.annotation.concurrent.NotThreadSafe;
 
 import com.cinchapi.concourse.Concourse;
 import com.cinchapi.concourse.util.Convert;
@@ -27,24 +26,19 @@ import com.cinchapi.concourse.util.Convert.ResolvableLink;
 import com.google.common.collect.Multimap;
 
 /**
- * Base implementation of the {@link Importer} interface that handles the work
- * of importing data into Concourse. The subclass that extends this
- * implementation only needs to worry about implementing the
- * {@link #handleFileImport(String)} method and converting each group of raw
- * data (i.e. a line in csv file) into a {@link Multimap} that is passed to the
- * {@link #importGroup(Multimap, String)} method.
+ * Base class for an importer to bring data from flat files into Concourse. The
+ * subclass must implement the {@link #importFile(String)} method. A
+ * {@link #concourse client connection} to Concourse is provided so that the
+ * implementation can choose the specific methods for optimally importing the
+ * data from the file.
  * <p>
- * This implementation does not mandate anything about the structure of the raw
- * data other than the assumption that it can be transformed into one or more
- * multi-mappings of keys to values (called a <strong>group</strong>). All data
- * in a group is imported into the appropriate record(s) together. Since this
- * requirement is very lightweight, it is possible to extend this implementation
- * to handle things like CSV files, XML files, SQL dumps, email documents, etc.
+ * This framework does not mandate anything about the structure of the raw data
+ * so it is possible to use this implementation to handle things like CSV files,
+ * XML files, SQL dumps, email documents, etc.
  * </p>
  * <h2>Import into new record</h2>
  * <p>
- * By default, all the data in a group is converted into one new record when
- * using the {@link #importGroup(Concourse, Multimap)} method.
+ * By default, all the data is imported into new records.
  * </p>
  * <h2>Import into existing record(s)</h2>
  * <p>
@@ -106,27 +100,17 @@ import com.google.common.collect.Multimap;
  * @param <T> the object type used for file validation
  * @author jnelson
  */
+<<<<<<< HEAD
 public abstract class Importer<T> {
+=======
+@NotThreadSafe
+public abstract class Importer {
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
 
     /**
      * The connection to Concourse.
      */
     protected final Concourse concourse;
-
-    /**
-     * The logger that is used for displaying operational information.
-     */
-    protected final Logger log;
-
-    /**
-     * Construct a new instance.
-     * 
-     * @param concourse
-     */
-    protected Importer(Concourse concourse, Logger log) {
-        this.concourse = concourse;
-        this.log = log;
-    }
 
     /**
      * Construct a new instance.
@@ -135,18 +119,36 @@ public abstract class Importer<T> {
      */
     protected Importer(Concourse concourse) {
         this.concourse = concourse;
-        this.log = (Logger) LoggerFactory.getLogger(getClass());
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            // NOTE: We close the Importer in a shutdown hook so that the
+            // process does not inflate the amount of time for importing
+
+            @Override
+            public void run() {
+                close();
+            }
+
+        }));
+    }
+
+    /**
+     * Close the importer and release any resources that it has open.
+     */
+    public final void close() {
+        concourse.exit();
     }
 
     /**
      * Import the data contained in {@code file} into {@link Concourse} and
-     * return the number of records into which data was imported.
+     * return the record ids where the data was imported.
      * 
      * @param file
      * @return the records affected by the import
      */
+    @Nullable
     public abstract Set<Long> importFile(String file);
 
+<<<<<<< HEAD
     /**
      * Check {@code line} to determine if is valid for the the file format that
      * is supported by the importer.
@@ -157,5 +159,9 @@ public abstract class Importer<T> {
      */
     protected abstract void validateFileFormat(T object)
             throws IllegalArgumentException;
+=======
+    @Nullable
+    public abstract Set<Long> importString(String data);
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
 
 }

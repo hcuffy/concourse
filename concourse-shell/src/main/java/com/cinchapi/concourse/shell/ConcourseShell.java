@@ -44,17 +44,21 @@ import jline.console.completer.StringsCompleter;
 import jline.console.history.FileHistory;
 
 import org.apache.thrift.transport.TTransportException;
+
 import com.cinchapi.concourse.config.ConcourseClientPreferences;
+
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.MultipleCompilationErrorsException;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.cinchapi.concourse.Concourse;
+import com.cinchapi.concourse.Link;
 import com.cinchapi.concourse.Tag;
 import com.cinchapi.concourse.Timestamp;
 import com.cinchapi.concourse.lang.Criteria;
 import com.cinchapi.concourse.lang.StartState;
+import com.cinchapi.concourse.thrift.Diff;
 import com.cinchapi.concourse.thrift.Operator;
 import com.cinchapi.concourse.thrift.ParseException;
 import com.cinchapi.concourse.thrift.SecurityException;
@@ -63,6 +67,7 @@ import com.cinchapi.concourse.util.Version;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -96,6 +101,17 @@ public final class ConcourseShell {
             if(opts.help) {
                 parser.usage();
                 System.exit(1);
+            }
+            if(!Strings.isNullOrEmpty(opts.prefs)) {
+                opts.prefs = FileOps.expandPath(opts.prefs,
+                        System.getProperty("user.dir.real"));
+                ConcourseClientPreferences prefs = ConcourseClientPreferences
+                        .open(opts.prefs);
+                opts.username = prefs.getUsername();
+                opts.password = new String(prefs.getPassword());
+                opts.host = prefs.getHost();
+                opts.port = prefs.getPort();
+                opts.environment = prefs.getEnvironment();
             }
             if(Strings.isNullOrEmpty(opts.password)) {
                 cash.setExpandEvents(false);
@@ -232,7 +248,6 @@ public final class ConcourseShell {
                     .toArray(new String[methods.size()]);
         }
         return ACCESSIBLE_API_METHODS;
-
     }
 
     /**
@@ -323,9 +338,10 @@ public final class ConcourseShell {
      * A list of char sequences that we must ban for security and other
      * miscellaneous purposes.
      */
-    private static List<String> BANNED_CHAR_SEQUENCES = Lists.newArrayList(
+    private static List<String> BANNED_CHAR_SEQUENCES = ImmutableList.of(
             "concourse.exit()", "concourse.username", "concourse.password",
-            "concourse.client", "concourse.getClass().getDeclaredFields()");
+            "concourse.client", "concourse.getClass().getDeclaredFields()",
+            Concourse.class.getName());
 
     /**
      * The message to display when a line of input contains a banned character
@@ -352,8 +368,23 @@ public final class ConcourseShell {
     private static final String EXTERNAL_SCRIPT_NAME = "ext";
 
     /**
-     * A closure that converts a string value to a tag.
+     * The list of classes that are imported directly into the
+     * {@link #groovyBinding} so that they can be used within CaSH the exact
+     * same way they would in code. Importing classes directly eliminates the
+     * need to bind custom closures to static methods in the classes.
      */
+    protected static List<Class<?>> IMPORTED_CLASSES = ImmutableList.of(
+            Timestamp.class, Diff.class, Link.class, Tag.class, Criteria.class,
+            Operator.class); // visible for testing
+
+    /**
+     * A closure that converts a string value to a tag.
+     * 
+     * @deprecated Use the {@link Tag} class directly as it is imported into the
+     *             {@link #groovyBinding} within the {@link #evaluate(String)}
+     *             method.
+     */
+    @Deprecated
     private static Closure<Tag> STRING_TO_TAG = new Closure<Tag>(null) {
 
         private static final long serialVersionUID = 1L;
@@ -367,7 +398,12 @@ public final class ConcourseShell {
 
     /**
      * A closure that returns a nwe CriteriaBuilder object.
+     * 
+     * @deprecated Use the {@link Criteria} class directly as it is imported
+     *             into the {@link #groovyBinding} within the
+     *             {@link #evaluate(String)} method.
      */
+    @Deprecated
     private static Closure<StartState> WHERE = new Closure<StartState>(null) {
 
         private static final long serialVersionUID = 1L;
@@ -519,9 +555,16 @@ public final class ConcourseShell {
         groovyBinding.setVariable("lnk2", Operator.LINKS_TO);
         groovyBinding.setVariable("time", timeFunction);
         groovyBinding.setVariable("date", timeFunction);
-        groovyBinding.setVariable("where", WHERE);
-        groovyBinding.setVariable("tag", STRING_TO_TAG);
+        groovyBinding.setVariable("where", WHERE); // deprecated
+        groovyBinding.setVariable("tag", STRING_TO_TAG); // deprecated
         groovyBinding.setVariable("whoami", whoami);
+        groovyBinding.setVariable("ADDED", Diff.ADDED);
+        groovyBinding.setVariable("REMOVED", Diff.REMOVED);
+        // Do direct import of declared classes
+        for (Class<?> clazz : IMPORTED_CLASSES) {
+            String variable = clazz.getSimpleName();
+            groovyBinding.setVariable(variable, clazz);
+        }
         // Add Showable variables
         for (Showable showable : Showable.values()) {
             groovyBinding.setVariable(showable.getName(), showable);
@@ -725,7 +768,7 @@ public final class ConcourseShell {
          * A handler for the client preferences that <em>may</em> exist in the
          * user's home directory.
          */
-        private ConcourseClientPreferences prefs = null;
+        private ConcourseClientPreferences prefsHandler = null;
 
         {
             String file = System.getProperty("user.home") + File.separator
@@ -734,37 +777,43 @@ public final class ConcourseShell {
                                                 // file exists first, so we
                                                 // don't create a blank one if
                                                 // it doesn't
-                prefs = ConcourseClientPreferences.open(file);
+                prefsHandler = ConcourseClientPreferences.open(file);
             }
         }
 
         @Parameter(names = { "-e", "--environment" }, description = "The environment of the Concourse Server to use")
-        public String environment = prefs != null ? prefs.getEnvironment() : "";
+        public String environment = prefsHandler != null ? prefsHandler
+                .getEnvironment() : "";
 
         @Parameter(names = "--help", help = true, hidden = true)
         public boolean help;
 
         @Parameter(names = { "-h", "--host" }, description = "The hostname where the Concourse Server is located")
-        public String host = prefs != null ? prefs.getHost() : "localhost";
+        public String host = prefsHandler != null ? prefsHandler.getHost()
+                : "localhost";
 
         @Parameter(names = "--password", description = "The password", password = false, hidden = true)
-        public String password = prefs != null ? new String(prefs.getPassword())
-                : null;
+        public String password = prefsHandler != null ? new String(
+                prefsHandler.getPassword()) : null;
 
         @Parameter(names = { "-p", "--port" }, description = "The port on which the Concourse Server is listening")
-        public int port = prefs != null ? prefs.getPort() : 1717;
+        public int port = prefsHandler != null ? prefsHandler.getPort() : 1717;
 
         @Parameter(names = { "-r", "--run" }, description = "The command to run non-interactively")
         public String run = "";
 
         @Parameter(names = { "-u", "--username" }, description = "The username with which to connect")
-        public String username = prefs != null ? prefs.getUsername() : "admin";
+        public String username = prefsHandler != null ? prefsHandler
+                .getUsername() : "admin";
 
         @Parameter(names = { "--run-commands", "--rc" }, description = "Path to a script that contains commands to run when the shell starts")
         public String ext = FileOps.getUserHome() + "/.cashrc";
 
         @Parameter(names = { "--no-run-commands", "--no-rc" }, description = "A flag to disable loading any run commands file")
         public boolean ignoreRunCommands = false;
+
+        @Parameter(names = "--prefs", description = "Path to the concourse_client.prefs file")
+        public String prefs;
 
     }
 

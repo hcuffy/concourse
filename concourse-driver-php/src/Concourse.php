@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *  http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,22 +32,22 @@ use Concourse\Convert;
  * This is the main entry point into the PHP Driver for Concourse.
  *
  * Use Concourse::connect() to create a client connection.
-*
-* @author Jeff Nelson
-*/
+ *
+ * @author Jeff Nelson
+ */
 final class Concourse {
 
     /**
-    * Create a new client connection.
-    *
-    * @param string $host the server host (optional, defaults to 'localhost')
-    * @param integer $port the listener port (optional, defaults to 1717)
-    * @param string $username the username with which to connect (optional, defaults to 'admin')
-    * @param string $password the password for the username (optional, defaults to 'admin')
-    * @param string $environment the environment to use (optional, defaults to the 'value of the default_environment' variable in the server's concourse.prefs file
-    * @return Concourse
-    * @throws Exception if the connection cannot be established
-    */
+     * Create a new client connection.
+     *
+     * @param string $host the server host (optional, defaults to 'localhost')
+     * @param integer $port the listener port (optional, defaults to 1717)
+     * @param string $username the username with which to connect (optional, defaults to 'admin')
+     * @param string $password the password for the username (optional, defaults to 'admin')
+     * @param string $environment the environment to use (optional, defaults to the 'value of the default_environment' variable in the server's concourse.prefs file
+     * @return Concourse
+     * @throws Exception if the connection cannot be established
+     */
     public static function connect($host = "localhost", $port = 1717,
     $username = "admin", $password = "admin", $environment = "") {
         return new Concourse($host, $port, $username, $password, $environment);
@@ -144,7 +144,7 @@ final class Concourse {
      *
      * Calling this method when the driver is not in <em>staging</em> mode is a
      * no-op.
-    */
+     */
     public function abort() {
         if(!empty($this->transaction)){
             $token = $this->transaction;
@@ -157,14 +157,22 @@ final class Concourse {
      * Append a <em>key</em> as a <em>value</em> in one or more records.
      *
      * @api
-     ** <strong>add($key, $value)</strong> - Append <em>key</em> as <em>value</em> in a new record and return the id.
-     ** <strong>add($key, $value, $record)</strong> - Append <em>key</em> as <em>value</em> in <em>record</em> if and only if it doesn't exist and return a boolean that indicates if the data was added.
-     ** <strong>add($key, $value, $records)</strong> - Append <em>key</em> as <em>value</em> in each of the <em>records</em> where it doesn't exist and return an array mapping from each record id to a boolean that indicates if the data was added in that record.
+     ** <strong>add($key, $value)</strong> - Append <em>key</em> as
+     * <em>value</em> in a new record and return the id.
+     ** <strong>add($key, $value, $record)</strong> - Append <em>key</em> as
+     * <em>value</em> in <em>record</em> if and only if it doesn't exist and
+     * return a boolean that indicates if the data was added.
+     ** <strong>add($key, $value, $records)</strong> - Append <em>key</em> as
+     * <em>value</em> in each of the <em>records</em> where it doesn't exist and
+     * return an array mapping from each record id to a boolean that indicates
+     * if the data was added in that record.
      *
      * @param string $key the field name
      * @param mixed $value the value to add
-     * @param integer $record the id of the record in which an attempt is made to add the data (optional)
-     * @param array $records an array of ids for the records in which an attempt is made to add the data (optional)
+     * @param integer $record the id of the record in which an attempt is made
+     * to add the data (optional)
+     * @param array $records an array of ids for the records in which an attempt
+     * is made to add the data (optional)
      * @return boolean|array|integer
      * @throws Concourse\Thrift\Exceptions\InvalidArgumentException
      */
@@ -176,35 +184,62 @@ final class Concourse {
      * List changes made to a <em>field</em> or <em>record</em> over time.
      *
      * @api
-     ** <strong>audit($key, $record)</strong> - List all the changes ever made to the <em>key</em> field in <em>record</em>.
-     ** <strong>audit($key, $record, $start)</strong> - List all the changes made to the <em>key</em> field in <em>record</em> since <em>start</em> (non-inclusive).
-     ** <strong>audit($key, $record, $start, $end)</strong> - List all the changes made to the <em>key</em> field in <em>record</em> between <em>start</em> (non-inclusive) and <em>end</em> (inclusive).
-     ** <strong>audit($record)</strong> - List all the changes ever made <em>record</em>.
-     ** <strong>audit($record, $start)</strong> - List all the changes made to <em>record</em> since <em>start</em> (non-inclusive).
-     ** <strong>audit($record, $start, $end)</strong> - List all the changes made to <em>record</em> between <em>start</em> (non-inclusive) and <em>end</em> (inclusive).
+     ** <strong>audit($key, $record)</strong> - List all the changes ever made
+     * to the <em>key</em> field in <em>record</em>.
+     ** <strong>audit($key, $record, $start)</strong> - List all the changes
+     * made to the <em>key</em> field in <em>record</em> since <em>start</em>
+     * (inclusive).
+     ** <strong>audit($key, $record, $start, $end)</strong> - List all the
+     * changes made to the <em>key</em> field in <em>record</em> between
+     * <em>start</em> (inclusive) and <em>end</em> (non-inclusive).
+     ** <strong>audit($record)</strong> - List all the changes ever made
+     * <em>record</em>.
+     ** <strong>audit($record, $start)</strong> - List all the changes made to
+     * <em>record</em> since <em>start</em> (inclusive).
+     ** <strong>audit($record, $start, $end)</strong> - List all the changes
+     * made to <em>record</em> between <em>start</em> (inclusive) and
+     * <em>end</em> (non-inclusive).
      *
      * @param string $key the field name
      * @param integer $record the record id
-     * @param integer|string $start a non-inclusive timestamp that is the starting point of the audit
-     * @param integer|string $end an inclusive timestamp of the most recent change that should possibly be included in the audit
-     * @return array an array containing, for each change, a mapping from timestamp to a description of the revision
+     * @param integer|string $start an an inclusive timestamp for the oldest
+     * change that should possibly be included in the audit
+     * @param integer|string $end a non-inclusive timestamp for the most recent
+     * change that should possibly be included in the audit
+     * @return array an array containing, for each change, a mapping from
+     * timestamp to a description of the revision
      */
     public function audit(){
         return $this->dispatch(func_get_args());
     }
 
     /**
-     * View the values that have been indexed.
+     * For one or more <em>fields</em>, view the values from all records
+     * currently or previously stored.
      *
      * @api
-     ** <strong>browse($key)</strong> - View that values that are indexed for <em>key</em> and return an array of records where the value is contained in the field.
-     ** <strong>browse($key, $timestamp)</strong> - View that values that were indexed for <em>key</em> at <em>timestamp</em> and return an array of records where the value was contained in the field.
-     ** <strong>browse($keys)</strong> - View the values that are indexed for each of the <em>keys</em> and return an array mapping each <em>key</em> to an array of records where the value is contained in the field.
-     ** <strong>browse($keys, $timestamp)</strong> - View the values that were indexed for each of the <em>keys</em> at <em>timestamp</em> and return an array mapping each <em>key</em> to an arra of records where the value was contained in the field.
+     ** <strong>browse($key)</strong> - View the values from all records that
+     * are currently stored for <em>key</em> and return an ArrayAccess
+     * associating each value to an array of records that contain that value in
+     * the <em>key</em> field.
+     ** <strong>browse($key, $timestamp)</strong> - View the values from all
+     * records that were stored for <em>key</em> at <em>timestamp</em> and
+     * return an ArrayAccess associating each value to an array of records that
+     * contained that value in the <em>key</em> field at <em>timestamp</em>.
+     ** <strong>browse($keys)</strong> - View the values from all records that
+     * are currently stored for each of the <em>keys</em> and return an
+     * ArrayAccess associating each <em>key</em> to an ArrayAccess associating
+     * each value to an array of records that contain that value in the
+     * <em>key</em> field.
+     ** <strong>browse($keys, $timestamp)</strong> - View the values from all
+     * records that were stored for each of the <em>keys</em> at timestamp and
+     * return an ArrayAccess associating each <em>key</em> to an ArrayAccess
+     * associating each value to an array of records that contained that value
+     * in the <em>key</em> field at <em>timestamp</em>.
      *
-     * @param string $key a single field name (optional: either $key or $keys is required)
-     * @param string $keys an array of field names (optional: either $key or $keys is required)
-     * @param integer|string $timestamp the timestamp to use when browsing the index (optional)
+     * @param string $key the field name
+     * @param string $keys an array of field names
+     * @param integer|string $timestamp the historical timestamp to use in the lookup
      * @return ArrayAccess
      */
     public function browse(){
@@ -212,45 +247,65 @@ final class Concourse {
     }
 
     /**
-     * Return a timeseries that shows the state of a field after each change.
+     * View a time series with snapshots of a <em>field</em> after every change.
      *
      * @api
-     ** <strong>chronologize($key, $record)</strong> - Return a timeseries that shows the state of of a field after every change.
-     ** <strong>chronologize($key, $record, $start)</strong> - Return a timeseries that shows the state of the field after every change since <em>$start</em>.
-     ** <strong>chronologize($key, $record, $start, $end)</strong> - Return a timeseries that shows the state of the field after every change between <em>$start</em> and <em>$end</em>.
+     ** <strong>chronologize($key, $record)</strong> - View a time series that
+     * associates the timestamp of each modification for <em>key</em> in
+     * <em>record</em> to a snapshot containing the values that were stored in
+     * the field after the change.
+     ** <strong>chronologize($key, $record, $start)</strong> - View a time
+     * series between <em>start</em> (inclusive) and the present that associates
+     * the timestamp of each modification for <em>key</em> in <em>record</em> to
+     * a snapshot containing the values that were stored in the field after the
+     * change.
+     ** <strong>chronologize($key, $record, $start, $end)</strong> - View a time
+     * series between <em>start</em> (inclusive) and <em>end</em>
+     * (non-inclusive) that associates the timestamp of each modification for
+     * <em>key</em> in <em>record</em> to a snapshot containing the values that
+     * were stored in the field after the change.
      *
      * @param string $key the field name
-     * @param integer $record the record that contains the field
-     * @param integer|string $start the first timestamp to include in the timeseries (optional)
-     * @param integer|String $end the last timestamp to include in the timeseries (optional)
-     * @return array mapping a timestamp to an array that contains all the values that were contained in the field at that timestamp
+     * @param integer $record the record id
+     * @param integer|string $start the first possible timestamp to include in
+     * the time series
+     * @param integer|string $end the timestamp that should be greater than
+     * every timestamp in the time series
+     * @return array associating each modification timestamp to the list of
+     * values that were stored in the field after the change
      */
     public function chronologize(){
         return Convert::phpify($this->dispatch(func_get_args()));
     }
 
     /**
-     * Atomically remove all the values from one or more fields or one or more records.
+     * Atomically remove all the values from one or more fields.
      *
      * @api
-     ** <strong>clear($key, $record)</strong> - Atomically remove all the values from a field in a single record.
-     ** <strong>clear($key, $records)</strong> - Atomically remove all the values from a field in multiple records.
-     ** <strong>clear($keys, $record)</strong> - Atomically remove all the values from multiple fields in a single record.
-     ** <strong>clear($keys, $records)</strong> - Atomically remove all the values from multiple fields in multiple records.
-     ** <strong>clear($record)</strong> - Atomically remove all the values from a single record.
-     ** <strong>clear($records)</strong> - Atomically remove all the values from multiple records.
+     ** <strong>clear($record)</strong> - Atomically remove all the values
+     * stored for every key in <em<record</em>.
+     ** <strong>clear($records)</strong> - Atomically remove all the values
+     * stored for every key in each of the <em>records</em>.
+     ** <strong>clear($key, $record)</strong> - Atomically remove all the values
+     * stored for <em>key</em> in <em>record</em>.
+     ** <strong>clear($keys, $record)</strong> - Atomically remove all the
+     * values stored for each of the <em>keys</em> in <em>record</em>.
+     ** <strong>clear($key, $records)</strong> - Atomically remove all the
+     * values stored for <em>key</em> in each of the <em>records</em>.
+     ** <strong>clear($keys, $records)</strong> - Atomically remove all the
+     * values stored for each of the <em>keys</em> in each of the <em>records</em>.
      *
-     * @param string $key the name of the field to clear
-     * @param array $keys a collection of fields to clear
-     * @param integer $record the record that contains the field/s or itself in entirety to clear
-     * @param array $records a collection of records that contain the field/s or  themselves in entirety to clear
+     * @param string $key the field name
+     * @param array $keys an array of field names
+     * @param integer $record the record id
+     * @param array $records an array of record ids
      */
     public function clear(){
         $this->dispatch(func_get_args());
     }
 
     /**
-     * Close the client connection.
+     * Terminate the client's session and close this connection.
      */
     public function close(){
         $this->client->logout($this->creds, $this->environment);
@@ -258,8 +313,22 @@ final class Concourse {
     }
 
     /**
-     * Commit the currently running transaction.
-     * @return boolean that indicates if the transaction successfully committed
+     * <p>
+     * Attempt to permanently commit any changes that are staged in a
+     * transaction and return <em>true</em> if and only if all the changes can
+     * be applied. Otherwise, returns <em>false</em> and all the changes are
+     * discarded.
+     * </p>
+     * <p>
+     * After returning, the driver will return to <em>autocommit</em> mode and
+     * all subsequent changes will be committed immediately.
+     * </p>
+     * <p>
+     * This method will return <em>false</em> if it is called when the driver is
+     * not in <em>staging</em> mode.
+     * </p>
+     * @return boolean <true> if all staged changes are committed, otherwise
+     * <false>
      * @throws Cinchapi\Concourse\Thrift\Exceptions\TransactionException
      */
     public function commit(){
@@ -274,17 +343,27 @@ final class Concourse {
     }
 
     /**
-     * Describe the fields that exist.
+     * For one or more records list all the keys that have at least one value.
      *
      * @api
-     ** <strong>describe($record)</strong> - Return all the keys in the <em>record</em>.
-     ** <strong>describe($record, $timestamp)</strong> - Return all the keys that were in the <em>record</em> at <em>timestamp</em>.
-     ** <strong>describe($records)</strong> - Return an array mapping each of the <em>records</em> to the array of keys that are in each record.
-     ** <strong>describe($records, $timestamp)</strong> - Return an array mapping each of the <em>records</em> to the array of keys that were in each record at <em>timestamp</em>.
+     ** <strong>describe($record)</strong> - List all the keys in
+     * <em>record</em> that have at least one value and return that Array of
+     * keys.
+     ** <strong>describe($record, $timestamp)</strong> - List all the keys in
+     * <em>record</em> that had at least one value at <em>timestamp</em> and
+     * return that Array of keys.
+     ** <strong>describe($records)</strong> - For each of the <em>records</em>,
+     * list all the keys that have at least one value and return an Array
+     * associating each record id to the Array of keys in that record.
+     ** <strong>describe($records, $timestamp)</strong> - For each of the
+     * <em>records</em>, list all the keys that had at least one value at
+     * <em>timestamp</em> and return an Array associating each record id to the
+     * Array of key that were in that record at <em>timestamp</em>.
      *
-     * @param integer $record the single record to describe (either $record or $records is required)
-     * @param array $records the collection of records to describe (either $record or $records is required)
-     * @param integer|string $timestamp the timestamp to use when describe the record/s (optional)
+     * @param integer $record the record id
+     * @param array $records a collection of record ids
+     * @param integer|string $timestamp the historical timestamp to use in the
+     * lookup
      * @return array
      */
     public function describe(){
@@ -292,21 +371,45 @@ final class Concourse {
     }
 
     /**
-     * Return the differences in data between two timestamps.
+     * List the net changes made to a field, record or index from one timestamp
+     * to another.
      *
      * @api
-     ** <strong>diff($key, $record, $start)</strong> - Return the differences in the field between the <em>start</em> timestamp and the present.
-     ** <strong>diff($key, $record, $start, $end)</strong> - Return the differences in the field between the <em>start</em> and <em>end</em> timestamps.
-     ** <strong>diff($key, $start)</strong> - Return the differences in the index between the <em>start</em> timestamp and the present.
-     ** <strong>diff($key, $start, $end)</strong> - Return the differences in the index between the <em>start</em> and <em>end</em> timestamps.
-     ** <strong>diff($record, $start)</strong> - Return the differences in the record between the <em>start</em> timestamp and the present.
-     ** <strong>diff($record, $start, $end)</strong> - Return the differences in the record between the <em>start</em> and <em>end</em> timestamps.
+     ** <strong>diff($record, $start)</strong> - List the net changes made to
+     * <em>record</em> since <em>start</em> and return an array that associates
+     * each key in <em>record</em> to another array that associates a change
+     * description to the array of values that fit the description.
+     ** <strong>diff($record, $start, $end)</strong> - List the net changes made
+     * to <em>record</em> from <em>start</em> to <em>end</em> and return an
+     * array that associates each key in <em>record</em> to another array that
+     * associates a change description to the array of values that fit the
+     * description.
+     ** <strong>diff($key, $record, $start)</strong> - List the net changes made
+     * to <em>key</em> in <em>record</em> since <em>start</em> and return an array
+     * that associates a change description to the array of values that fit the
+     * description.
+     ** <strong>diff($key, $record, $start, $end)</strong> - List the net changes
+     * made to <em>key</em> in <em>record</em> from <em>start</em> to <em>end</em>
+     * and return an array that associates a change description to the array of
+     * values that fit the description.
+     ** <strong>diff($key, $start)</strong> - List the net changes made to the <em>key</em> field across all records since <em>start</em> and return an array
+     * that associates each value stored for <em>key</em> across all records to
+     * another array that associates a change description to the array of records
+     * where the description applies to that value in the <em>key</em> field.
+     ** <strong>diff($key, $start, $end)</strong> - List the net changes made to
+     * the <em>key</em> field across all records from <em>start</em> to
+     * <em>end</em> and return an array that associates each value stored for
+     * <em>key</em> across all records to another array that associates a change
+     * description to the array of records where the description applies to that
+     * value in the <em>key</em> field.
      *
-     * @param string $key the field or index name
-     * @param integer $record the record that contains the field or the record to diff
-     * @param integer|string $start the timestamp of the original state
-     * @param integer|string $end the timestamp of the changed state
-     * @return array mapping a description of a changed (ADDED or REMOVED) to an array of values that match the change
+     * @param string $key the field name
+     * @param integer $record the record id
+     * @param integer|string $start the base timestamp from which the diff is
+     * calculated
+     * @param integer|string $end the comparison timestamp to which the diff is
+     * calculated
+     * @return array
      */
     public function diff(){
         return Convert::phpify($this->dispatch(func_get_args()));
@@ -472,17 +575,17 @@ final class Concourse {
      * @api
      ** <strong>jsonify($record)</strong> - Return a JSON string that contains all the data in <em>record</em>.
      ** <strong>jsonify($record, $timestamp)</strong> - Return a JSON string that contains all the data in <em>record</em> at <em>timestamp</em>.
-     ** <strong>jsonify($record, $includeId)</strong> - Return a JSON string that contains all the data in <em>record</em> and optionally include the record id  in the dump. This option is useful for dumping data from one instance and importing into another.
-     ** <strong>jsonify($record, $timestamp, $includeId)</strong> - Return a JSON string that contains all the data in <em>record</em> at <em>timestamp</em> and optionally include the record id  in the dump. This option is useful for dumping data from one instance and importing into another.
+     ** <strong>jsonify($record, $includeId)</strong> - Return a JSON string that contains all the data in <em>record</em> and optionally include the record id in the dump. This option is useful for dumping data from one instance and importing into another.
+     ** <strong>jsonify($record, $timestamp, $includeId)</strong> - Return a JSON string that contains all the data in <em>record</em> at <em>timestamp</em> and optionally include the record id in the dump. This option is useful for dumping data from one instance and importing into another.
      ** <strong>jsonify($records)</strong> - Return a JSON string that contains all the data in each of the <em>records</em>.
      ** <strong>jsonify($records, $timestamp)</strong> - Return a JSON string that contains all the data in each of the <em>records</em> at <em>timestamp</em>.
-     ** <strong>jsonify($records, $includeId)</strong> - Return a JSON string that contains all the data in each of the <em>records</em> and optionally include the record id  in the dump. This option is useful for dumping data from one instance and importing into another.
-     ** <strong>jsonify($records, $timestamp, $includeId)</strong> - Return a JSON string that contains all the data in each of the <em>records</em> at <em>timestamp</em> and optionally include the record id  in the dump. This option is useful for dumping data from one instance and importing into another.
+     ** <strong>jsonify($records, $includeId)</strong> - Return a JSON string that contains all the data in each of the <em>records</em> and optionally include the record id in the dump. This option is useful for dumping data from one instance and importing into another.
+     ** <strong>jsonify($records, $timestamp, $includeId)</strong> - Return a JSON string that contains all the data in each of the <em>records</em> at <em>timestamp</em> and optionally include the record id in the dump. This option is useful for dumping data from one instance and importing into another.
      *
-     * @param integer $record  the id of the record to dump
-     * @param array $records  an array containing the ids of all the records to dump
-     * @param integer|string $timestamp  the timestamp to use when selecting the data to dump
-     * @param boolean $includeId  a flag that determines whether record ids are included in the data dump
+     * @param integer $record the id of the record to dump
+     * @param array $records an array containing the ids of all the records to dump
+     * @param integer|string $timestamp the timestamp to use when selecting the data to dump
+     * @param boolean $includeId a flag that determines whether record ids are included in the data dump
      * @return string the data encoded as a JSON string
      */
     public function jsonify(){
@@ -515,7 +618,7 @@ final class Concourse {
      *
      * @api
      ** <strong>link($key, $source, $destination)</strong> - Add a link from the <em>key</em> field in the <em>source</em> record to the <em>destination</em> record.
-     ** <strong>link($key, $source, $destinations)</strong> - Add a link from the <em>key</em> field in the <em>source</em> record to the each of the  <em>destinations</em>.
+     ** <strong>link($key, $source, $destinations)</strong> - Add a link from the <em>key</em> field in the <em>source</em> record to the each of the <em>destinations</em>.
      *
      * @param string $key the field name
      * @param integer $source the source record
@@ -678,45 +781,45 @@ final class Concourse {
     }
 
     /**
-    * Start a new transaction.
-    *
-    * This method will turn on <em>staging</em> mode so that all subsequent
-    * changes are collected in an isolated buffer before possibly being
-    * committed. Staged operations are guaranteed to be reliable, all or
-    * nothing, units of work that allow correct recovery from failures and
-    * provide isolation between clients so the database is always consistent.
-    *
-    * After this method returns, all subsequent operations will be done in
-    * <em>staging<em> mode until either #commit or #abort is called.
-    *
-    * All operations that occur within a transaction should be wrapped in a
-    * try-catch block so that transaction exceptions can be caught and the
-    * application can decided to abort or retry the transaction:
-    *
-    * <code>
-    * 	$concourse->stage();
-    * 	try {
-    * 		$concourse->get(["key" => "name", "record" => 1]);
-    * 		$concourse->add("name", "Jeff Nelson", 1);
-    * 		$concourse->commit();
-    * 	}
-    * 	catch(Cinchapi\Concourse\Thrift\Exceptions\TransactionException $e) {
-    * 		$concourse->abort();
-    * 	}
-    * </code>
-    *
-    * Alternatively, if you supply a block to this method, starting and
-    * committing the transactions happens automatically and there is also
-    * automatic logic to gracefully handle exceptions that may result from
-    * any of the actions in the transaction.
-    *
-    * <code>
-    * 	$concourse->stage(function() use($concourse){
-    * 		$concourse->get(["key" => "name", "record" => 1]);
-    * 		$concourse->add("name", "Jeff Nelson", 1);
-    * 	});
-    * </code>
-    */
+     * Start a new transaction.
+     *
+     * This method will turn on <em>staging</em> mode so that all subsequent
+     * changes are collected in an isolated buffer before possibly being
+     * committed. Staged operations are guaranteed to be reliable, all or
+     * nothing, units of work that allow correct recovery from failures and
+     * provide isolation between clients so the database is always consistent.
+     *
+     * After this method returns, all subsequent operations will be done in
+     * <em>staging<em> mode until either #commit or #abort is called.
+     *
+     * All operations that occur within a transaction should be wrapped in a
+     * try-catch block so that transaction exceptions can be caught and the
+     * application can decided to abort or retry the transaction:
+     *
+     * <code>
+     * 	$concourse->stage();
+     * 	try {
+     * 		$concourse->get(["key" => "name", "record" => 1]);
+     * 		$concourse->add("name", "Jeff Nelson", 1);
+     * 		$concourse->commit();
+     * 	}
+     * 	catch(Cinchapi\Concourse\Thrift\Exceptions\TransactionException $e) {
+     * 		$concourse->abort();
+     * 	}
+     * </code>
+     *
+     * Alternatively, if you supply a block to this method, starting and
+     * committing the transactions happens automatically and there is also
+     * automatic logic to gracefully handle exceptions that may result from
+     * any of the actions in the transaction.
+     *
+     * <code>
+     * 	$concourse->stage(function() use($concourse){
+     * 		$concourse->get(["key" => "name", "record" => 1]);
+     * 		$concourse->add("name", "Jeff Nelson", 1);
+     * 	});
+     * </code>
+     */
     public function stage($lambda = null){
         if(is_callable($lambda)){
             $this->commit();
@@ -749,7 +852,7 @@ final class Concourse {
      *
      * @api
      ** <strong>unlink($key, $source, $destination)</strong> - Remove the link from the <em>key</em> in the <em>source</em> record to the <em>destination</em> record.
-     ** <strong>unlink($key, $source, $destinations)</strong> - Remove the link from the <em>key</em> in the <em>source</em> record to the each of the  <em>destinations</em>.
+     ** <strong>unlink($key, $source, $destinations)</strong> - Remove the link from the <em>key</em> in the <em>source</em> record to the each of the <em>destinations</em>.
      *
      * @param string $key the field name
      * @param integer $source the source record
@@ -820,7 +923,7 @@ final class Concourse {
      * Please note that after returning, this method guarantees that
      * <em>key</em> in <em>record</em> will only contain <em>value</em>, even if
      * it already existed alongside other values (e.g. calling
-     * concourse.verifyOrSet("foo", "bar", 1) will mean that "foo" in record 1
+     * concourse.verifyOrSet("inclusive", "bar", 1) will mean that "inclusive" in record 1
      * will only have "bar" as a value after returning, even if the field
      * already contained "bar", "baz" and "apple" as values.
      *
@@ -856,11 +959,11 @@ final class Concourse {
     }
 
     /**
-    * Login with the username and password and locally store the AccessToken
-    * to use with subsequent CRUD methods.
-    *
-    * @throws Thrift\Exceptions\SecurityException
-    */
+     * Login with the username and password and locally store the AccessToken
+     * to use with subsequent CRUD methods.
+     *
+     * @throws Thrift\Exceptions\SecurityException
+     */
     private function authenticate() {
         try {
             $this->creds = $this->client->login($this->username, $this->password,

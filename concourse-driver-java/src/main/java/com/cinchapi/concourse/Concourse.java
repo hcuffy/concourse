@@ -56,11 +56,23 @@ import com.cinchapi.concourse.util.Transformers;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 
 /**
  * A client connection to a Concourse deployment.
  * <p>
  * Use one of the {@link Concourse#connect()} methods to instantiate.
+ * </p>
+ * 
+ * <h2>Overview</h2>
+ * <p>
+ * Concourse is a self-tuning database that is designed for both ad hoc
+ * analytics and high volume transactions at scale. Developers use Concourse to
+ * quickly build mission critical software while also benefiting from real time
+ * insight into their most important data. With Concourse, end-to-end data
+ * management requires no extra infrastructure, no prior configuration and no
+ * additional coding–all of which greatly reduce costs and allow developers to
+ * focus on core business problems.
  * </p>
  * 
  * <h2>Using Transactions</h2>
@@ -103,7 +115,7 @@ public abstract class Concourse implements AutoCloseable {
      * if the file does not exist, the server at localhost:1717) and return a
      * handle to facilitate interaction.
      * 
-     * @param environment - the environment to use
+     * @param environment the environment to use
      * @return the handle
      */
     public static Concourse connect(String environment) {
@@ -114,10 +126,10 @@ public abstract class Concourse implements AutoCloseable {
      * Create a new connection to the default environment of the specified
      * Concourse Server and return a handle to facilitate interaction.
      * 
-     * @param host - the server host
-     * @param port - the listener port for client connections
-     * @param username - the name of the user on behalf of whom to connect
-     * @param password - the password for the {@code username}
+     * @param host the server host
+     * @param port the listener port for client connections
+     * @param username the name of the user on behalf of whom to connect
+     * @param password the password for the {@code username}
      * @return the handle
      */
     public static Concourse connect(String host, int port, String username,
@@ -129,11 +141,11 @@ public abstract class Concourse implements AutoCloseable {
      * Create a new connection to the specified {@code environment} of the
      * specified Concourse Server and return a handle to facilitate interaction.
      * 
-     * @param host - the server host
-     * @param port - the listener port for client connections
-     * @param username - the name of the user on behalf of whom to connect
-     * @param password - the password for the {@code username}
-     * @param environment - the name of the environment to use for the
+     * @param host the server host
+     * @param port the listener port for client connections
+     * @param username the name of the user on behalf of whom to connect
+     * @param password the password for the {@code username}
+     * @param environment the name of the environment to use for the
      *            connection
      * @return the handle
      */
@@ -146,8 +158,9 @@ public abstract class Concourse implements AutoCloseable {
      * Create a new connection using the information specified in the prefs
      * {@code file}.
      * 
-     * @param file - the path to the prefs file that contains the information
-     *            for the Concourse deployment
+     * @param file the absolute path to the prefs file that contains the
+     *            information for the Concourse deployment (relative paths will
+     *            resolve to the user's home directory)
      * @return the handle
      */
     public static Concourse connectWithPrefs(String file) {
@@ -172,12 +185,21 @@ public abstract class Concourse implements AutoCloseable {
     public abstract void abort();
 
     /**
+     * Append {@code key} as {@code value} in a new record.
+     * 
+     * @param key the field name
+     * @param value the value to add
+     * @return the new record id
+     */
+    public abstract <T> long add(String key, T value);
+
+    /**
      * Append {@code key} as {@code value} in each of the {@code records} where
      * it doesn't exist.
      * 
-     * @param key - the field name
-     * @param value - the value to add
-     * @param records - a collection of record ids where an attempt is made to
+     * @param key the field name
+     * @param value the value to add
+     * @param records a collection of record ids where an attempt is made to
      *            add the data
      * @return a mapping from each record id to a boolean that indicates if the
      *         data was added
@@ -187,21 +209,12 @@ public abstract class Concourse implements AutoCloseable {
             Collection<Long> records);
 
     /**
-     * Append {@code key} as {@code value} in a new record.
-     * 
-     * @param key - the field name
-     * @param value - the value to add
-     * @return the new record id
-     */
-    public abstract <T> long add(String key, T value);
-
-    /**
      * Append {@code key} as {@code value} in {@code record} if and only if it
      * doesn't exist.
      * 
-     * @param key - the field name
-     * @param value - the value to add
-     * @param record - the record id where an attempt is made to add the data
+     * @param key the field name
+     * @param value the value to add
+     * @param record the record id where an attempt is made to add the data
      * @return a boolean that indicates if the data was added
      */
     public abstract <T> boolean add(String key, T value, long record);
@@ -209,7 +222,7 @@ public abstract class Concourse implements AutoCloseable {
     /**
      * List all the changes ever made to {@code record}.
      * 
-     * @param record - the record id
+     * @param record the record id
      * @return for each change, a mapping from timestamp to a description of the
      *         revision
      */
@@ -217,11 +230,11 @@ public abstract class Concourse implements AutoCloseable {
 
     /**
      * List all the changes made to {@code record} since {@code start}
-     * (non-inclusive).
+     * (inclusive).
      *
-     * @param record - the record id
-     * @param start - a non-inclusive {@link Timestamp} that is the starting
-     *            point of the audit
+     * @param record the record id
+     * @param start an inclusive {@link Timestamp} of the oldest change that
+     *            should possibly be included in the audit
      * @return for each change, a mapping from timestamp to a description of the
      *         revision
      */
@@ -229,12 +242,12 @@ public abstract class Concourse implements AutoCloseable {
 
     /**
      * List all the changes made to {@code record} between {@code start}
-     * (non-inclusive) and {@code end} (inclusive).
+     * (inclusive) and {@code end} (non-inclusive).
      *
-     * @param record - the record id
-     * @param start - a non-inclusive {@link Timestamp} that is the starting
-     *            point of the audit
-     * @param end - an inclusive {@link Timestamp} of the most recent change
+     * @param record the record id
+     * @param start an inclusive {@link Timestamp} for the oldest change that
+     *            should possibly be included in the audit
+     * @param end a non-inclusive {@link Timestamp} for the most recent change
      *            that should possibly be included in the audit
      * @return for each change, a mapping from timestamp to a description of the
      *         revision
@@ -245,8 +258,8 @@ public abstract class Concourse implements AutoCloseable {
     /**
      * List all the changes ever made to the {@code key} field in {@code record}
      *
-     * @param key - the field name
-     * @param record - the record id
+     * @param key the field name
+     * @param record the record id
      * @return for each change, a mapping from timestamp to a description of the
      *         revision
      */
@@ -254,12 +267,12 @@ public abstract class Concourse implements AutoCloseable {
 
     /**
      * List all the changes made to the {@code key} field in {@code record}
-     * since {@code start} (non-inclusive).
+     * since {@code start} (inclusive).
      * 
-     * @param key - the field name
-     * @param record - the record id
-     * @param start - a non-inclusive {@link Timestamp} that is the starting
-     *            point of the audit
+     * @param key the field name
+     * @param record the record id
+     * @param start an inclusive {@link Timestamp} for the oldest change that
+     *            should possibly be included in the audit
      * @return for each change, a mapping from timestamp to a description of the
      *         revision
      */
@@ -268,13 +281,13 @@ public abstract class Concourse implements AutoCloseable {
 
     /**
      * List all the changes made to the {@code key} field in {@code record}
-     * between {@code start} (non-inclusive) and {@code end} (inclusive).
+     * between {@code start} (inclusive) and {@code end} (non-inclusive).
      * 
-     * @param key - the field name
-     * @param record - the record id
-     * @param start - a non-inclusive {@link Timestamp} that is the starting
-     *            point of the audit
-     * @param end - an inclusive {@link Timestamp} of the most recent change
+     * @param key the field name
+     * @param record the record id
+     * @param start an inclusive {@link Timestamp} for the oldest change that
+     *            should possibly be included in the audit
+     * @param end a non-inclusive {@link Timestamp} for the most recent change
      *            that should possibly be included in the audit
      * @return for each change, a mapping from timestamp to a description of the
      *         revision
@@ -283,291 +296,361 @@ public abstract class Concourse implements AutoCloseable {
             Timestamp start, Timestamp end);
 
     /**
-     * Browse all of the {@code keys} and return all the data that is indexed as
-     * a mapping from value to the set of records containing the value for each
-     * {@code key}.
+     * View the values from all records that are currently stored for each of
+     * the {@code keys}.
      * 
-     * @param keys
-     * @return a mapping of all the indexed values and their associated records.
+     * @param keys a collection of field names
+     * @return a {@link Map} associating each key to a {@link Map} associating
+     *         each value to the {@link Set} of records that contain that value
+     *         in the {@code key} field
      */
     public abstract Map<String, Map<Object, Set<Long>>> browse(
             Collection<String> keys);
 
     /**
-     * Browse all of the {@code keys} at {@code timestamp} and return all the
-     * data that was indexed as a mapping from value to the set of records
-     * containing the value for each {@code key}.
+     * View the values from all records that were stored for each of the
+     * {@code keys} at {@code timestamp}.
      * 
-     * @param keys
-     * @param timestamp
-     * @return a mapping of all the indexed values and their associated records.
+     * @param keys a collection of field names
+     * @param timestamp the historical timestamp to use in the lookup
+     * @return a {@link Map} associating each key to a {@link Map} associating
+     *         each value to the {@link Set} of records that contained that
+     *         value in the {@code key} field at {@code timestamp}
      */
     public abstract Map<String, Map<Object, Set<Long>>> browse(
             Collection<String> keys, Timestamp timestamp);
 
     /**
-     * Browse {@code key} and return all the data that is indexed as a mapping
-     * from value to the set of records containing the value for {@code key}.
+     * View the values from all records that are currently stored for
+     * {@code key}.
      * 
-     * @param key
-     * @return a mapping of all the indexed values and their associated records.
+     * @param key the field name
+     * @return a {@link Map} associating each value to the {@link Set} of
+     *         records that contain that value in the {@code key} field
      */
     public abstract Map<Object, Set<Long>> browse(String key);
 
     /**
-     * Browse {@code key} at {@code timestamp} and return all the data that was
-     * indexed as a mapping from value to the set of records that contained the
-     * value for {@code key} .
+     * View the values from all records that were stored for {@code key} at
+     * {@code timestamp}.
      * 
-     * @param key
-     * @param timestamp
-     * @return a mapping of all the indexed values and their associated records.
+     * @param key the field name
+     * @param timestamp the historical timestamp to use in the lookup
+     * @return a {@link Map} associating each value to the {@link Set} of
+     *         records that contained that value in the {@code key} field at
+     *         {@code timestamp}
      */
     public abstract Map<Object, Set<Long>> browse(String key,
             Timestamp timestamp);
 
     /**
-     * Chronologize non-empty sets of values in {@code key} from {@code record}
-     * and return a mapping from each timestamp to the non-empty set of values.
+     * View a time series that associates the timestamp of each modification for
+     * {@code key} in {@code record} to a snapshot containing the values that
+     * were stored in the field after the change.
      * 
-     * @param key
-     * @param record
-     * @return a chronological mapping from each timestamp to the set of values
-     *         that were contained for the key in record
+     * @param key the field name
+     * @param record the record id
+     * @return a {@link Map} associating each modification timestamp to the
+     *         {@link Set} of values that were stored in the field after the
+     *         change.
      */
     public abstract Map<Timestamp, Set<Object>> chronologize(String key,
             long record);
 
     /**
-     * Chronologize non-empty sets of values in {@code key} from {@code record}
-     * from {@code start} timestamp inclusively to present and return a mapping
-     * from each timestamp to the non-emtpy set of values.
+     * View a time series between {@code start} (inclusive) and the present that
+     * associates the timestamp of each modification for {@code key} in
+     * {@code record} to a snapshot containing the values that
+     * were stored in the field after the change.
      * 
-     * @param key
-     * @param record
-     * @param start
-     * @return a chronological mapping from each timestamp to the set of values
-     *         that were contained for the key in record from specified start
-     *         timestamp to present
+     * @param key the field name
+     * @param record the record id
+     * @param start the first possible {@link Timestamp} to include in the
+     *            time series
+     * @return a {@link Map} associating each modification timestamp to the
+     *         {@link Set} of values that were stored in the field after the
+     *         change.
      */
-    @CompoundOperation
     public abstract Map<Timestamp, Set<Object>> chronologize(String key,
             long record, Timestamp start);
 
     /**
-     * Chronologize non-empty sets of values in {@code key} from {@code record}
-     * from {@code start} timestamp inclusively to {@code end} timestamp
-     * exclusively and return a mapping from each timestamp to the non-empty set
-     * of values.
+     * View a time series between {@code start} (inclusive) and {@code end}
+     * (non-inclusive) that associates the timestamp of each modification for
+     * {@code key} in {@code record} to a snapshot containing the values that
+     * were stored in the field after the change.
      * 
-     * @param key
-     * @param record
-     * @param start
-     * @param end
-     * @return a chronological mapping from each timestamp to the set of values
-     *         that were contained for the key in record from specified start
-     *         timestamp to specified end timestamp
+     * @param key the field name
+     * @param record the record id
+     * @param start the first possible {@link Timestamp} to include in the
+     *            time series
+     * @param end the {@link Timestamp} that should be greater than every
+     *            timestamp in the time series
+     * @return a {@link Map} associating each modification timestamp to the
+     *         {@link Set} of values that were stored in the field after the
+     *         change.
      */
-    @CompoundOperation
     public abstract Map<Timestamp, Set<Object>> chronologize(String key,
             long record, Timestamp start, Timestamp end);
 
     /**
-     * Clear every {@code key} and contained value in each of the
-     * {@code records} by removing every value for each {@code key} in each
-     * record.
+     * Atomically remove all the values stored for every key in each of the
+     * {@code records}.
      * 
-     * @param records
+     * @param records a collection of record ids
      */
-    @CompoundOperation
     public abstract void clear(Collection<Long> records);
 
     /**
-     * Clear each of the {@code keys} in each of the {@code records} by removing
-     * every value for each key in each record.
+     * Atomically remove all the values stored for each of the {@code keys} in
+     * each of the {@code records}.
      * 
-     * @param keys
-     * @param records
+     * @param keys a collection of field names
+     * @param records a collection of record ids.
      */
-    @CompoundOperation
     public abstract void clear(Collection<String> keys, Collection<Long> records);
 
     /**
-     * Clear each of the {@code keys} in {@code record} by removing every value
-     * for each key.
+     * Atomically remove all the values stored for each of the {@code keys} in
+     * {@code record}.
      * 
-     * @param keys
-     * @param record
+     * @param keys a collection of field names
+     * @param record the record id
      */
-    @CompoundOperation
     public abstract void clear(Collection<String> keys, long record);
 
     /**
-     * Atomically clear {@code record} by removing each contained key and their
-     * values.
+     * Atomically remove all the values stored for every key in {@code record}.
      * 
-     * @param record
+     * @param record the record id
      */
     public abstract void clear(long record);
 
     /**
-     * Clear {@code key} in each of the {@code records} by removing every value
-     * for {@code key} in each record.
+     * Atomically remove all the values stored for {@code key} in each of the
+     * {@code records}.
      * 
-     * @param key
-     * @param records
+     * @param key the field name
+     * @param records a collection of record ids
      */
-    @CompoundOperation
     public abstract void clear(String key, Collection<Long> records);
 
     /**
-     * Atomically clear {@code key} in {@code record} by removing each contained
-     * value.
+     * Atomically remove all the values stored for {@code key} in {@code record}
      * 
-     * @param record
+     * @param key the field name
+     * @param record the record id
      */
     public abstract void clear(String key, long record);
 
+    /**
+     * <p>
+     * <em>An alias for the {@link #exit()} method.</em>
+     * </p>
+     * {@inheritDoc}
+     */
     @Override
     public final void close() {
         exit();
     }
 
     /**
-     * Attempt to permanently commit all the currently staged changes. This
-     * function returns {@code true} if and only if all the changes can be
-     * successfully applied. Otherwise, this function returns {@code false} and
-     * all the changes are aborted.
+     * Attempt to permanently commit any changes that are staged in a
+     * transaction and return {@code true} if and only if all the changes can be
+     * applied. Otherwise, returns {@code false} and all the changes are
+     * discarded.
      * <p>
-     * After this function returns, Concourse will return to {@code autocommit}
-     * mode and all subsequent changes will be written immediately.
+     * After returning, the driver will return to {@code autocommit} mode and
+     * all subsequent changes will be committed immediately.
+     * </p>
+     * <p>
+     * This method will return {@code false} if it is called when the driver is
+     * not in {@code staging} mode.
      * </p>
      * 
-     * @return {@code true} if all staged changes are successfully committed
+     * @return {@code true} if all staged changes are committed, otherwise
+     *         {@code false}
      */
     public abstract boolean commit();
 
-    @Deprecated
-    public abstract long create();
-
     /**
-     * Describe each of the {@code records} and return a mapping from each
-     * record to the keys that currently have at least one value.
+     * For each of the {@code records}, list all of the keys that have at least
+     * one value.
      * 
-     * @param records
-     * @return the populated keys in each record
+     * @param records a collection of record ids
+     * @return a {@link Map} associating each record id to the {@link Set} of
+     *         keys in that record
      */
-    @CompoundOperation
     public abstract Map<Long, Set<String>> describe(Collection<Long> records);
 
     /**
-     * Describe each of the {@code records} at {@code timestamp} and return a
-     * mapping from each record to the keys that had at least one value.
+     * For each of the {@code records}, list all the keys that had at least one
+     * value at {@code timestamp}.
      * 
-     * @param records
-     * @param timestamp
-     * @return the populated keys in each record at {@code timestamp}
+     * @param records a collection of record ids
+     * @param timestamp the historical timestamp to use in the lookup
+     * @return a {@link Map} associating each record id to the {@link Set} of
+     *         keys that were in that record at {@code timestamp}
      */
-    @CompoundOperation
     public abstract Map<Long, Set<String>> describe(Collection<Long> records,
             Timestamp timestamp);
 
     /**
-     * Describe {@code record} and return the keys that currently have at least
-     * one value.
+     * List all the keys in {@code record} that have at least one value.
      * 
-     * @param record
-     * @return the populated keys in {@code record}
+     * @param record the record id
+     * @return the {@link Set} of keys in {@code record}
      */
     public abstract Set<String> describe(long record);
 
     /**
-     * Describe {@code record} at {@code timestamp} and return the keys that had
-     * at least one value.
+     * List all the keys in {@code record} that had at least one value at
+     * {@code timestamp}.
      * 
-     * @param record
-     * @param timestamp
-     * @return the populated keys in {@code record} at {@code timestamp}
+     * @param record the record id
+     * @param timestamp the historical timestamp to use in the lookup
+     * @return the {@link Set} of keys that were in {@code record} at
+     *         {@code timestamp}
      */
     public abstract Set<String> describe(long record, Timestamp timestamp);
 
     /**
-     * Return all the changes (Addition and Deletion) of {@code record} and
-     * {@code value} in {@code record} for all {@code key} between {@code start}
-     * and current time.
+     * List the net changes made to {@code record} since {@code start}.
+     * <p>
+     * If you begin with the state of the {@code record} at {@code start} and
+     * re-apply all the changes in the diff, you'll re-create the state of the
+     * same {@code record} at the present.
+     * </p>
      * 
-     * @param record
-     * @param start
-     * @return the changes made to the record within the range
+     * @param record the record id
+     * @param start the base timestamp from which the diff is calculated
+     * @return a {@link Map} that associates each key in the {@code record} to
+     *         another {@link Map} that associates a {@link Diff change
+     *         description} to the {@link Set} of values that fit the
+     *         description (i.e. <code>
+     *         {"key": {ADDED: ["value1", "value2"], REMOVED: ["value3", "value4"]}}
+     *         </code> )
      */
     public abstract <T> Map<String, Map<Diff, Set<T>>> diff(long record,
             Timestamp start);
 
     /**
-     * Return all the changes (Addition and Deletion) of {@code record} and
-     * {@code value} in {@code record} for all {@code key} between {@code start}
-     * and {@code end}.
+     * List the net changes made to {@code record} from {@code start} to
+     * {@code end}.
+     *
+     * <p>
+     * If you begin with the state of the {@code record} at {@code start} and
+     * re-apply all the changes in the diff, you'll re-create the state of the
+     * same {@code record} at {@code end}.
+     * </p>
      * 
-     * @param record
-     * @param start
-     * @param end
-     * @return the changes made to the record within the range
+     * @param record the record id
+     * @param start the base timestamp from which the diff is calculated
+     * @param end the comparison timestamp to which the diff is calculated
+     * @return a {@link Map} that associates each key in the {@code record} to
+     *         another {@link Map} that associates a {@link Diff change
+     *         description} to the {@link Set} of values that fit the
+     *         description (i.e. <code>
+     *         {"key": {ADDED: ["value1", "value2"], REMOVED: ["value3", "value4"]}}
+     *         </code> )
      */
     public abstract <T> Map<String, Map<Diff, Set<T>>> diff(long record,
             Timestamp start, Timestamp end);
 
     /**
-     * Return all the changes (Addition and Deletion) of {@code value} of
-     * {@code key} in {@code record} between {@code start} and current time.
+     * List the net changes made to {@code key} in {@code record} since
+     * {@code start}.
      * 
-     * @param key
-     * @param record
-     * @param start
-     * @return the changes made to the {@code key}/{@code record} within the
-     *         range
+     * <p>
+     * If you begin with the state of the field at {@code start} and re-apply
+     * all the changes in the diff, you'll re-create the state of the same field
+     * at the present.
+     * </p>
+     * 
+     * @param key the field name
+     * @param record the record id
+     * @param start the base timestamp from which the diff is calculated
+     * @return a {@link Map} that associates a {@link Diff change
+     *         description} to the {@link Set} of values that fit the
+     *         description (i.e. <code>
+     *         {ADDED: ["value1", "value2"], REMOVED: ["value3", "value4"]}
+     *         </code> )
      */
     public abstract <T> Map<Diff, Set<T>> diff(String key, long record,
             Timestamp start);
 
     /**
-     * Return all the changes (Addition and Deletion) of {@code value} of
-     * {@code key} in {@code record} between {@code start} and {@code end}.
+     * List the net changes made to {@code key} in {@code record} from
+     * {@code start} to {@code end}.
      * 
-     * @param key
-     * @param record
-     * @param start
-     * @param end
-     * @return the changes made to the {@code key}/{@coee record} within the
-     *         range
+     * <p>
+     * If you begin with the state of the field at {@code start} and re-apply
+     * all the changes in the diff, you'll re-create the state of the same field
+     * at {@code end}.
+     * </p>
+     * 
+     * @param key the field name
+     * @param record the record id
+     * @param start the base timestamp from which the diff is calculated
+     * @param end the comparison timestamp to which the diff is calculated
+     * @return a {@link Map} that associates a {@link Diff change
+     *         description} to the {@link Set} of values that fit the
+     *         description (i.e. <code>
+     *         {ADDED: ["value1", "value2"], REMOVED: ["value3", "value4"]}
+     *         </code> )
      */
     public abstract <T> Map<Diff, Set<T>> diff(String key, long record,
             Timestamp start, Timestamp end);
 
     /**
-     * Return all the changes (Addition and Deletion) of {@code key} and it's
-     * value between {@code start} and and current time.
+     * List the net changes made to the {@code key} field across all records
+     * since {@code start}.
      * 
-     * @param key
-     * @param start
-     * @return
+     * <p>
+     * If you begin with the state of the inverted index for {@code key} at
+     * {@code start} and re-apply all the changes in the diff, you'll re-create
+     * the state of the same index at the present.
+     * </p>
+     * 
+     * @param key the field name
+     * @param start the base timestamp from which the diff is calculated
+     * @return a {@link Map} that associates each value stored for {@code key}
+     *         across all records to another {@link Map} that associates a
+     *         {@link Diff change description} to the {@link Set} of records
+     *         where the description applies to that value in the {@code key}
+     *         field (i.e. <code>
+     *         {"value1": {ADDED: [1, 2], REMOVED: [3, 4]}}
+     *         </code>)
      */
     public abstract <T> Map<T, Map<Diff, Set<Long>>> diff(String key,
             Timestamp start);
 
     /**
-     * Return all the changes (Addition and Deletion) of {@code key} and it's
-     * value between {@code start} and {@code end}.
+     * List the net changes made to the {@code key} field across all records
+     * from {@code start} to {@code end}.
      * 
-     * @param key
-     * @param start
-     * @param end
-     * @return the changes map to the key within the range
+     * <p>
+     * If you begin with the state of the inverted index for {@code key} at
+     * {@code start} and re-apply all the changes in the diff, you'll re-create
+     * the state of the same index at {@code end}.
+     * </p>
+     * 
+     * @param key the field name
+     * @param start the base timestamp from which the diff is calculated
+     * @param end the comparison timestamp to which the diff is calculated
+     * @return a {@link Map} that associates each value stored for {@code key}
+     *         across all records to another {@link Map} that associates a
+     *         {@link Diff change description} to the {@link Set} of records
+     *         where the description applies to that value in the {@code key}
+     *         field (i.e. <code>
+     *         {"value1": {ADDED: [1, 2], REMOVED: [3, 4]}}
+     *         </code>)
      */
     public abstract <T> Map<T, Map<Diff, Set<Long>>> diff(String key,
             Timestamp start, Timestamp end);
 
     /**
-     * Close the Client connection.
+     * Terminate the client's session and close this connection.
      */
     public abstract void exit();
 
@@ -742,49 +825,63 @@ public abstract class Concourse implements AutoCloseable {
             throws DuplicateEntryException;
 
     /**
-     * Find and return the unique record that matches the {@code ccl} string, if
-     * one exist. If no records match, then insert the data in the {@code json}
-     * string a new record and return the id.
+     * Find and return the unique record that matches the {@code criteria}, if
+     * one exist. If and only if no record matches, insert the key/value
+     * associations in {@code data} into a new record and return the id.
      * 
      * <p>
      * This method can be used to simulate a unique index because it atomically
      * checks for a condition and only inserts data if that condition isn't
      * currently satisfied.
      * </p>
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
      * 
-     * @param criteria - A {@link Criteria} builder sequence that has reached a
+     * @param criteria A {@link Criteria} builder sequence that has reached a
      *            buildable state, but that has not be officially
      *            {@link BuildableState#build() built}.
-     * @param json - a JSON blob describing a single object
+     * @param data a {@link Map} with key/value associations to insert into the
+     *            new record
      * @return the unique record that matches {@code criteria}, if one exist
      *         or the record where the {@code json} data is inserted
      * @throws DuplicateEntryException
      */
-    public abstract long findOrInsert(Criteria criteria, String json)
-            throws DuplicateEntryException;
+    public final long findOrInsert(BuildableState criteria,
+            Map<String, Object> data) throws DuplicateEntryException {
+        String json = Convert.mapToJson(data);
+        return findOrInsert(criteria, json);
+    }
 
     /**
-     * Find and return the unique record that matches the {@code ccl} string, if
-     * one exist. If no records match, then insert the data in the {@code json}
-     * string a new record and return the id.
+     * Find and return the unique record that matches the {@code criteria}, if
+     * one exist. If and only if no record matches, insert the key/value
+     * associations in {@code data} into a new record and return the id.
      * 
      * <p>
      * This method can be used to simulate a unique index because it atomically
      * checks for a condition and only inserts data if that condition isn't
      * currently satisfied.
      * </p>
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
      * 
-     * @param criteria - A {@link Criteria} builder sequence that has reached a
+     * @param criteria A {@link Criteria} builder sequence that has reached a
      *            buildable state, but that has not be officially
      *            {@link BuildableState#build() built}.
-     * @param json - a JSON blob describing a single object
+     * @param data a {@link Multimap} with key/value associations to insert into
+     *            the new record
      * @return the unique record that matches {@code criteria}, if one exist
      *         or the record where the {@code json} data is inserted
      * @throws DuplicateEntryException
      */
-    public long findOrInsert(BuildableState criteria, String json)
-            throws DuplicateEntryException {
-        return findOrInsert(criteria.build(), json);
+    public final long findOrInsert(BuildableState criteria,
+            Multimap<String, Object> data) throws DuplicateEntryException {
+        String json = Convert.mapToJson(data);
+        return findOrInsert(criteria, json);
     }
 
     /**
@@ -798,8 +895,166 @@ public abstract class Concourse implements AutoCloseable {
      * currently satisfied.
      * </p>
      * 
-     * @param ccl - the criteria expressed using CCL
-     * @param json - a JSON blob describing a single object
+     * @param criteria A {@link Criteria} builder sequence that has reached a
+     *            buildable state, but that has not be officially
+     *            {@link BuildableState#build() built}.
+     * @param json a JSON blob describing a single object
+     * @return the unique record that matches {@code criteria}, if one exist
+     *         or the record where the {@code json} data is inserted
+     * @throws DuplicateEntryException
+     */
+    public long findOrInsert(BuildableState criteria, String json)
+            throws DuplicateEntryException {
+        return findOrInsert(criteria.build(), json);
+    }
+
+    /**
+     * Find and return the unique record that matches the {@code criteria}, if
+     * one exist. If and only if no record matches, insert the key/value
+     * associations in {@code data} into a new record and return the id.
+     * 
+     * <p>
+     * This method can be used to simulate a unique index because it atomically
+     * checks for a condition and only inserts data if that condition isn't
+     * currently satisfied.
+     * </p>
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
+     * 
+     * @param criteria a well formed {@link Criteria}
+     * @param data a {@link Map} with key/value associations to insert into the
+     *            new record
+     * @return the unique record that matches {@code criteria}, if one exist
+     *         or the record where the {@code json} data is inserted
+     * @throws DuplicateEntryException
+     */
+    public final long findOrInsert(Criteria criteria, Map<String, Object> data)
+            throws DuplicateEntryException {
+        String json = Convert.mapToJson(data);
+        return findOrInsert(criteria, json);
+    }
+
+    /**
+     * Find and return the unique record that matches the {@code criteria}, if
+     * one exist. If and only if no record matches, insert the key/value
+     * associations in {@code data} into a new record and return the id.
+     * 
+     * <p>
+     * This method can be used to simulate a unique index because it atomically
+     * checks for a condition and only inserts data if that condition isn't
+     * currently satisfied.
+     * </p>
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
+     * 
+     * @param criteria a well formed {@link Criteria}
+     * @param data a {@link Multimap} with key/value associations to insert into
+     *            the new record
+     * @return the unique record that matches {@code criteria}, if one exist
+     *         or the record where the {@code json} data is inserted
+     * @throws DuplicateEntryException
+     */
+    public final long findOrInsert(Criteria criteria,
+            Multimap<String, Object> data) throws DuplicateEntryException {
+        String json = Convert.mapToJson(data);
+        return findOrInsert(criteria, json);
+    }
+
+    /**
+     * Find and return the unique record that matches the {@code ccl} string, if
+     * one exist. If no records match, then insert the data in the {@code json}
+     * string a new record and return the id.
+     * 
+     * <p>
+     * This method can be used to simulate a unique index because it atomically
+     * checks for a condition and only inserts data if that condition isn't
+     * currently satisfied.
+     * </p>
+     * 
+     * @param criteria A {@link Criteria} builder sequence that has reached a
+     *            buildable state, but that has not be officially
+     *            {@link BuildableState#build() built}.
+     * @param data a JSON blob describing a single object
+     * @return the unique record that matches {@code criteria}, if one exist
+     *         or the record where the {@code json} data is inserted
+     * @throws DuplicateEntryException
+     */
+    public abstract long findOrInsert(Criteria criteria, String json)
+            throws DuplicateEntryException;
+
+    /**
+     * Find and return the unique record that matches the {@code ccl} criteria,
+     * if one exist. If and only if no record matches, insert the key/value
+     * associations in {@code data} into a new record and return the id.
+     * 
+     * <p>
+     * This method can be used to simulate a unique index because it atomically
+     * checks for a condition and only inserts data if that condition isn't
+     * currently satisfied.
+     * </p>
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
+     * 
+     * @param ccl the well formed criteria expressed using CCL
+     * @param data a {@link Map} with key/value associations to insert into the
+     *            new record
+     * @return the unique record that matches {@code criteria}, if one exist
+     *         or the record where the {@code json} data is inserted
+     * @throws DuplicateEntryException
+     */
+    public final long findOrInsert(String ccl, Map<String, Object> data)
+            throws DuplicateEntryException {
+        String json = Convert.mapToJson(data);
+        return findOrInsert(ccl, json);
+    }
+
+    /**
+     * Find and return the unique record that matches the {@code ccl} criteria,
+     * if one exist. If and only if no record matches, insert the key/value
+     * associations in {@code data} into a new record and return the id.
+     * 
+     * <p>
+     * This method can be used to simulate a unique index because it atomically
+     * checks for a condition and only inserts data if that condition isn't
+     * currently satisfied.
+     * </p>
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
+     * 
+     * @param ccl the well formed criteria expressed using CCL
+     * @param data a {@link Multimap} with key/value associations to insert into
+     *            the new record
+     * @return the unique record that matches {@code criteria}, if one exist
+     *         or the record where the {@code json} data is inserted
+     * @throws DuplicateEntryException
+     */
+    public final long findOrInsert(String ccl, Multimap<String, Object> data)
+            throws DuplicateEntryException {
+        String json = Convert.mapToJson(data);
+        return findOrInsert(ccl, json);
+    }
+
+    /**
+     * Find and return the unique record that matches the {@code ccl} string, if
+     * one exist. If no records match, then insert the data in the {@code json}
+     * string a new record and return the id.
+     * 
+     * <p>
+     * This method can be used to simulate a unique index because it atomically
+     * checks for a condition and only inserts data if that condition isn't
+     * currently satisfied.
+     * </p>
+     * 
+     * @param ccl the criteria expressed using CCL
+     * @param json a JSON blob describing a single object
      * @return the unique record that matches {@code ccl} string, if one exist
      *         or the record where the {@code json} data is inserted
      * @throws DuplicateEntryException
@@ -1127,6 +1382,145 @@ public abstract class Concourse implements AutoCloseable {
     public abstract String getServerVersion();
 
     /**
+     * Within a single atomic operation, for each of the {@link Multimap maps}
+     * in {@code data}, insert the key/value associations into a new and
+     * distinct record.
+     * <p>
+     * Each of the values in each map in {@code data} must be a primitive or one
+     * dimensional object (e.g. no nested {@link Map maps} or {@link Multimap
+     * multimaps}).
+     * </p>
+     * 
+     * @param data a {@link List} of {@link Multimap maps}, each with key/value
+     *            associations to insert into a new record
+     * @return a {@link Set} of ids containing the ids of the new records where
+     *         the maps in {@code data} were inserted, respectively
+     */
+    public final Set<Long> insert(Collection<Multimap<String, Object>> data) {
+        String json = Convert.mapsToJson(data);
+        return insert(json);
+    }
+
+    /**
+     * Atomically insert the key/value associations from {@code data} into a new
+     * record.
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
+     * 
+     * @param data a {@link Map} with key/value associations to insert into the
+     *            new record
+     * @return the id of the new record where the {@code data} was inserted
+     */
+    public final long insert(Map<String, Object> data) {
+        String json = Convert.mapToJson(data);
+        return insert(json).iterator().next();
+    }
+
+    /**
+     * Atomically insert the key/value associations in {@code data} into each of
+     * the {@code records}.
+     * 
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
+     * 
+     * @param data a {@link Map} with key/value associations to insert into each
+     *            of the {@code records}
+     * @param records a collection of ids for records where the {@code data}
+     *            should attempt to be inserted
+     * @return a {@link Map} associating each record id to a boolean that
+     *         indicates if the data was successfully inserted in that record
+     */
+    public final Map<Long, Boolean> insert(Map<String, Object> data,
+            Collection<Long> records) {
+        String json = Convert.mapToJson(data);
+        return insert(json, records);
+
+    }
+
+    /**
+     * Atomically insert the key/value associations in {@code data} into
+     * {@code record}.
+     * 
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
+     * 
+     * @param data a {@link Map} with key/value associations to insert into
+     *            {@code record}
+     * @param record the record id
+     * @return {@code true} if all of the {@code data} is successfully inserted
+     *         into {@code record}, otherwise {@code false}
+     */
+    public final boolean insert(Map<String, Object> data, long record) {
+        String json = Convert.mapToJson(data);
+        return insert(json, record);
+    }
+
+    /**
+     * Atomically insert the key/value associations from {@code data} into a new
+     * record.
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
+     * 
+     * @param data a {@link Multimap} with key/value associations to insert into
+     *            the new record
+     * @return the id of the new record where the {@code data} was inserted
+     */
+    public final long insert(Multimap<String, Object> data) {
+        String json = Convert.mapToJson(data);
+        return insert(json).iterator().next();
+    }
+
+    /**
+     * Atomically insert the key/value associations in {@code data} into each of
+     * the {@code records}.
+     * 
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
+     * 
+     * @param data a {@link Multimap} with key/value associations to insert into
+     *            each of the {@code records}
+     * @param records a collection of ids for records where the {@code data}
+     *            should attempt to be inserted
+     * @return a {@link Map} associating each record id to a boolean that
+     *         indicates if the data was successfully inserted in that record
+     */
+    public final Map<Long, Boolean> insert(Multimap<String, Object> data,
+            Collection<Long> records) {
+        String json = Convert.mapToJson(data);
+        return insert(json, records);
+    }
+
+    /**
+     * Atomically insert the key/value associations in {@code data} into
+     * {@code record}.
+     * 
+     * <p>
+     * Each of the values in {@code data} must be a primitive or one dimensional
+     * object (e.g. no nested {@link Map maps} or {@link Multimap multimaps}).
+     * </p>
+     * 
+     * @param data a {@link Multimap} with key/value associations to insert into
+     *            {@code record}
+     * @param record the record id
+     * @return {@code true} if all of the {@code data} is successfully inserted
+     *         into {@code record}, otherwise {@code false}
+     */
+    public final boolean insert(Multimap<String, Object> data, long record) {
+        String json = Convert.mapToJson(data);
+        return insert(json, record);
+    }
+
+    /**
      * Atomically insert the key/value mappings described in the {@code json}
      * formatted string into a new record.
      * <p>
@@ -1155,7 +1549,6 @@ public abstract class Concourse implements AutoCloseable {
      * @return a mapping from each primary key to a boolean describing if the
      *         data was successfully inserted into that record
      */
-    @CompoundOperation
     public abstract Map<Long, Boolean> insert(String json,
             Collection<Long> records);
 
@@ -1811,7 +2204,7 @@ public abstract class Concourse implements AutoCloseable {
      * that may result from any actions in the {@code task}.
      * </p>
      * 
-     * @param task - the group of operations to execute in the transaction
+     * @param task the group of operations to execute in the transaction
      * @return a boolean that indicates if the transaction successfully
      *         committed
      * @throws TransactionException
@@ -2129,6 +2522,19 @@ public abstract class Concourse implements AutoCloseable {
         }
 
         @Override
+        public <T> long add(final String key, final T value) {
+            return execute(new Callable<Long>() {
+
+                @Override
+                public Long call() throws Exception {
+                    return client.addKeyValue(key, Convert.javaToThrift(value),
+                            creds, transaction, environment);
+                }
+
+            });
+        }
+
+        @Override
         public <T> Map<Long, Boolean> add(final String key, final T value,
                 final Collection<Long> records) {
             return execute(new Callable<Map<Long, Boolean>>() {
@@ -2145,19 +2551,6 @@ public abstract class Concourse implements AutoCloseable {
                         pretty.put(record, raw.get(record));
                     }
                     return pretty;
-                }
-
-            });
-        }
-
-        @Override
-        public <T> long add(final String key, final T value) {
-            return execute(new Callable<Long>() {
-
-                @Override
-                public Long call() throws Exception {
-                    return client.addKeyValue(key, Convert.javaToThrift(value),
-                            creds, transaction, environment);
                 }
 
             });
@@ -2198,14 +2591,21 @@ public abstract class Concourse implements AutoCloseable {
         @Override
         public Map<Timestamp, String> audit(final long record,
                 final Timestamp start) {
-            Preconditions.checkArgument(start.getMicros() <= Time.now(),
-                    "Start of range cannot be greater than the present");
             return execute(new Callable<Map<Timestamp, String>>() {
 
                 @Override
                 public Map<Timestamp, String> call() throws Exception {
-                    Map<Long, String> audit = client.auditRecordStart(record,
-                            start.getMicros(), creds, transaction, environment);
+                    Map<Long, String> audit;
+                    if(start.isString()) {
+                        audit = client.auditRecordStartstr(record,
+                                start.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        audit = client.auditRecordStart(record,
+                                start.getMicros(), creds, transaction,
+                                environment);
+                    }
                     return ((PrettyLinkedHashMap<Timestamp, String>) Transformers
                             .transformMap(audit,
                                     Conversions.timestampToMicros()))
@@ -2218,15 +2618,21 @@ public abstract class Concourse implements AutoCloseable {
         @Override
         public Map<Timestamp, String> audit(final long record,
                 final Timestamp start, final Timestamp end) {
-            Preconditions.checkArgument(start.getMicros() <= end.getMicros(),
-                    "Start of range cannot be greater than the end");
             return execute(new Callable<Map<Timestamp, String>>() {
 
                 @Override
                 public Map<Timestamp, String> call() throws Exception {
-                    Map<Long, String> audit = client.auditRecordStartEnd(
-                            record, start.getMicros(), end.getMicros(), creds,
-                            transaction, environment);
+                    Map<Long, String> audit;
+                    if(start.isString()) {
+                        audit = client.auditRecordStartstrEndstr(record,
+                                start.toString(), end.toString(), creds,
+                                transaction, environment);
+                    }
+                    else {
+                        audit = client.auditRecordStartEnd(record,
+                                start.getMicros(), end.getMicros(), creds,
+                                transaction, environment);
+                    }
                     return ((PrettyLinkedHashMap<Timestamp, String>) Transformers
                             .transformMap(audit,
                                     Conversions.timestampToMicros()))
@@ -2256,15 +2662,21 @@ public abstract class Concourse implements AutoCloseable {
         @Override
         public Map<Timestamp, String> audit(final String key,
                 final long record, final Timestamp start) {
-            Preconditions.checkArgument(start.getMicros() <= Time.now(),
-                    "Start of range cannot be greater than the present");
             return execute(new Callable<Map<Timestamp, String>>() {
 
                 @Override
                 public Map<Timestamp, String> call() throws Exception {
-                    Map<Long, String> audit = client.auditKeyRecordStart(key,
-                            record, start.getMicros(), creds, transaction,
-                            environment);
+                    Map<Long, String> audit;
+                    if(start.isString()) {
+                        audit = client.auditKeyRecordStartstr(key, record,
+                                start.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        audit = client.auditKeyRecordStart(key, record,
+                                start.getMicros(), creds, transaction,
+                                environment);
+                    }
                     return ((PrettyLinkedHashMap<Timestamp, String>) Transformers
                             .transformMap(audit,
                                     Conversions.timestampToMicros()))
@@ -2277,15 +2689,21 @@ public abstract class Concourse implements AutoCloseable {
         @Override
         public Map<Timestamp, String> audit(final String key,
                 final long record, final Timestamp start, final Timestamp end) {
-            Preconditions.checkArgument(start.getMicros() <= end.getMicros(),
-                    "Start of range cannot be greater than the end");
             return execute(new Callable<Map<Timestamp, String>>() {
 
                 @Override
                 public Map<Timestamp, String> call() throws Exception {
-                    Map<Long, String> audit = client.auditKeyRecordStartEnd(
-                            key, record, start.getMicros(), end.getMicros(),
-                            creds, transaction, environment);
+                    Map<Long, String> audit;
+                    if(start.isString()) {
+                        audit = client.auditKeyRecordStartstrEndstr(key,
+                                record, start.toString(), end.toString(),
+                                creds, transaction, environment);
+                    }
+                    else {
+                        audit = client.auditKeyRecordStartEnd(key, record,
+                                start.getMicros(), end.getMicros(), creds,
+                                transaction, environment);
+                    }
                     return ((PrettyLinkedHashMap<Timestamp, String>) Transformers
                             .transformMap(audit,
                                     Conversions.timestampToMicros()))
@@ -2328,10 +2746,17 @@ public abstract class Concourse implements AutoCloseable {
                 @Override
                 public Map<String, Map<Object, Set<Long>>> call()
                         throws Exception {
-                    Map<String, Map<TObject, Set<Long>>> raw = client
-                            .browseKeysTime(Collections.toList(keys),
-                                    timestamp.getMicros(), creds, transaction,
-                                    environment);
+                    Map<String, Map<TObject, Set<Long>>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.browseKeysTimestr(
+                                Collections.toList(keys), timestamp.toString(),
+                                creds, transaction, environment);
+                    }
+                    else {
+                        raw = client.browseKeysTime(Collections.toList(keys),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<String, Map<Object, Set<Long>>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Key");
                     for (Entry<String, Map<TObject, Set<Long>>> entry : raw
@@ -2372,9 +2797,16 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Object, Set<Long>> call() throws Exception {
-                    Map<TObject, Set<Long>> raw = client.browseKeyTime(key,
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<TObject, Set<Long>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.browseKeyTimestr(key,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.browseKeyTime(key, timestamp.getMicros(),
+                                creds, transaction, environment);
+                    }
                     Map<Object, Set<Long>> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap(key, "Records");
                     for (Entry<TObject, Set<Long>> entry : raw.entrySet()) {
@@ -2417,10 +2849,17 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Timestamp, Set<Object>> call() throws Exception {
-                    Map<Long, Set<TObject>> raw = client
-                            .chronologizeKeyRecordStart(key, record,
-                                    start.getMicros(), creds, transaction,
-                                    environment);
+                    Map<Long, Set<TObject>> raw;
+                    if(start.isString()) {
+                        raw = client.chronologizeKeyRecordStartstr(key, record,
+                                start.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.chronologizeKeyRecordStart(key, record,
+                                start.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Timestamp, Set<Object>> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("DateTime", "Values");
                     for (Entry<Long, Set<TObject>> entry : raw.entrySet()) {
@@ -2436,16 +2875,21 @@ public abstract class Concourse implements AutoCloseable {
         @Override
         public Map<Timestamp, Set<Object>> chronologize(final String key,
                 final long record, final Timestamp start, final Timestamp end) {
-            Preconditions.checkArgument(start.getMicros() <= end.getMicros(),
-                    "Start of range cannot be greater than the end");
             return execute(new Callable<Map<Timestamp, Set<Object>>>() {
 
                 @Override
                 public Map<Timestamp, Set<Object>> call() throws Exception {
-                    Map<Long, Set<TObject>> raw = client
-                            .chronologizeKeyRecordStartEnd(key, record,
-                                    start.getMicros(), end.getMicros(), creds,
-                                    transaction, environment);
+                    Map<Long, Set<TObject>> raw;
+                    if(start.isString()) {
+                        raw = client.chronologizeKeyRecordStartstrEndstr(key,
+                                record, start.toString(), end.toString(),
+                                creds, transaction, environment);
+                    }
+                    else {
+                        raw = client.chronologizeKeyRecordStartEnd(key, record,
+                                start.getMicros(), end.getMicros(), creds,
+                                transaction, environment);
+                    }
                     Map<Timestamp, Set<Object>> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("DateTime", "Values");
                     for (Entry<Long, Set<TObject>> entry : raw.entrySet()) {
@@ -2561,11 +3005,6 @@ public abstract class Concourse implements AutoCloseable {
         }
 
         @Override
-        public long create() {
-            return Time.now();
-        }
-
-        @Override
         public Map<Long, Set<String>> describe(final Collection<Long> records) {
             return execute(new Callable<Map<Long, Set<String>>>() {
 
@@ -2591,10 +3030,19 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Set<String>> call() throws Exception {
-                    Map<Long, Set<String>> raw = client.describeRecordsTime(
-                            Collections.toLongList(records),
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<Long, Set<String>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.describeRecordsTimestr(
+                                Collections.toLongList(records),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.describeRecordsTime(
+                                Collections.toLongList(records),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Set<String>> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Record", "Keys");
                     for (Entry<Long, Set<String>> entry : raw.entrySet()) {
@@ -2624,10 +3072,16 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Set<String> call() throws Exception {
-                    Set<String> result = client.describeRecordTime(record,
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
-                    return result;
+                    if(timestamp.isString()) {
+                        return client.describeRecordTimestr(record,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        return client.describeRecordTime(record,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                 }
             });
         }
@@ -2635,7 +3089,33 @@ public abstract class Concourse implements AutoCloseable {
         @Override
         public <T> Map<String, Map<Diff, Set<T>>> diff(final long record,
                 final Timestamp start) {
-            return diff(record, start, Timestamp.now());
+            return execute(new Callable<Map<String, Map<Diff, Set<T>>>>() {
+
+                @Override
+                public Map<String, Map<Diff, Set<T>>> call() throws Exception {
+                    Map<String, Map<Diff, Set<TObject>>> raw;
+                    if(start.isString()) {
+                        raw = client.diffRecordStartstr(record,
+                                start.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.diffRecordStart(record, start.getMicros(),
+                                creds, transaction, environment);
+                    }
+                    PrettyLinkedTableMap<String, Diff, Set<T>> pretty = PrettyLinkedTableMap
+                            .newPrettyLinkedTableMap();
+                    pretty.setRowName("Key");
+                    for (Entry<String, Map<Diff, Set<TObject>>> entry : raw
+                            .entrySet()) {
+                        pretty.put(entry.getKey(), Transformers
+                                .transformMapSet(entry.getValue(),
+                                        Conversions.<Diff> none(),
+                                        Conversions.<T> thriftToJavaCasted()));
+                    }
+                    return pretty;
+                }
+            });
         }
 
         @Override
@@ -2645,12 +3125,20 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<String, Map<Diff, Set<T>>> call() throws Exception {
-                    Map<String, Map<Diff, Set<TObject>>> raw = client
-                            .diffRecordStartEnd(record, start.getMicros(),
-                                    end.getMicros(), creds, transaction,
-                                    environment);
-                    Map<String, Map<Diff, Set<T>>> pretty = PrettyLinkedTableMap
+                    Map<String, Map<Diff, Set<TObject>>> raw;
+                    if(start.isString()) {
+                        raw = client.diffRecordStartstrEndstr(record,
+                                start.toString(), end.toString(), creds,
+                                transaction, environment);
+                    }
+                    else {
+                        raw = client.diffRecordStartEnd(record,
+                                start.getMicros(), end.getMicros(), creds,
+                                transaction, environment);
+                    }
+                    PrettyLinkedTableMap<String, Diff, Set<T>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap();
+                    pretty.setRowName("Key");
                     for (Entry<String, Map<Diff, Set<TObject>>> entry : raw
                             .entrySet()) {
                         pretty.put(entry.getKey(), Transformers
@@ -2666,19 +3154,21 @@ public abstract class Concourse implements AutoCloseable {
         @Override
         public <T> Map<Diff, Set<T>> diff(final String key, final long record,
                 final Timestamp start) {
-            return diff(key, record, start, Timestamp.now());
-        }
-
-        @Override
-        public <T> Map<Diff, Set<T>> diff(final String key, final long record,
-                final Timestamp start, final Timestamp end) {
             return execute(new Callable<Map<Diff, Set<T>>>() {
 
                 @Override
                 public Map<Diff, Set<T>> call() throws Exception {
-                    Map<Diff, Set<TObject>> raw = client.diffKeyRecordStartEnd(
-                            key, record, start.getMicros(), end.getMicros(),
-                            creds, transaction, environment);
+                    Map<Diff, Set<TObject>> raw;
+                    if(start.isString()) {
+                        raw = client.diffKeyRecordStartstr(key, record,
+                                start.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.diffKeyRecordStart(key, record,
+                                start.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Diff, Set<T>> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Operation", "Value");
                     for (Entry<Diff, Set<TObject>> entry : raw.entrySet()) {
@@ -2692,9 +3182,63 @@ public abstract class Concourse implements AutoCloseable {
         }
 
         @Override
+        public <T> Map<Diff, Set<T>> diff(final String key, final long record,
+                final Timestamp start, final Timestamp end) {
+            return execute(new Callable<Map<Diff, Set<T>>>() {
+
+                @Override
+                public Map<Diff, Set<T>> call() throws Exception {
+                    Map<Diff, Set<TObject>> raw;
+                    if(start.isString()) {
+                        raw = client.diffKeyRecordStartstrEndstr(key, record,
+                                start.toString(), end.toString(), creds,
+                                transaction, environment);
+                    }
+                    else {
+                        raw = client.diffKeyRecordStartEnd(key, record,
+                                start.getMicros(), end.getMicros(), creds,
+                                transaction, environment);
+                    }
+                    Map<Diff, Set<T>> pretty = PrettyLinkedHashMap
+                            .newPrettyLinkedHashMap("Operation", "Value");
+                    for (Entry<Diff, Set<TObject>> entry : raw.entrySet()) {
+                        pretty.put(entry.getKey(), Transformers.transformSet(
+                                entry.getValue(),
+                                Conversions.<T> thriftToJavaCasted()));
+                    }
+                    return pretty;
+                }
+            });
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
         public <T> Map<T, Map<Diff, Set<Long>>> diff(final String key,
                 final Timestamp start) {
-            return diff(key, start, Timestamp.now());
+            return execute(new Callable<Map<T, Map<Diff, Set<Long>>>>() {
+
+                @Override
+                public Map<T, Map<Diff, Set<Long>>> call() throws Exception {
+                    Map<TObject, Map<Diff, Set<Long>>> raw;
+                    if(start.isString()) {
+                        raw = client.diffKeyStartstr(key, start.toString(),
+                                creds, transaction, environment);
+                    }
+                    else {
+                        raw = client.diffKeyStart(key, start.getMicros(),
+                                creds, transaction, environment);
+                    }
+                    PrettyLinkedTableMap<T, Diff, Set<Long>> pretty = PrettyLinkedTableMap
+                            .newPrettyLinkedTableMap();
+                    pretty.setRowName("Value");
+                    for (Entry<TObject, Map<Diff, Set<Long>>> entry : raw
+                            .entrySet()) {
+                        pretty.put((T) Convert.thriftToJava(entry.getKey()),
+                                entry.getValue());
+                    }
+                    return pretty;
+                }
+            });
         }
 
         @Override
@@ -2705,10 +3249,17 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<T, Map<Diff, Set<Long>>> call() throws Exception {
-                    Map<TObject, Map<Diff, Set<Long>>> raw = client
-                            .diffKeyStartEnd(key, start.getMicros(),
-                                    end.getMicros(), creds, transaction,
-                                    environment);
+                    Map<TObject, Map<Diff, Set<Long>>> raw;
+                    if(start.isString()) {
+                        raw = client.diffKeyStartstrEndstr(key,
+                                start.toString(), end.toString(), creds,
+                                transaction, environment);
+                    }
+                    else {
+                        raw = client.diffKeyStartEnd(key, start.getMicros(),
+                                end.getMicros(), creds, transaction,
+                                environment);
+                    }
                     PrettyLinkedTableMap<T, Diff, Set<Long>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap();
                     pretty.setRowName("Value");
@@ -2732,8 +3283,8 @@ public abstract class Concourse implements AutoCloseable {
             catch (com.cinchapi.concourse.thrift.SecurityException
                     | TTransportException e) {
                 // Handle corner case where the client is existing because of
-                // (or after the occurence of) a password change, which means it
-                // can't perform a traditional logout. Its worth nothing that
+                // (or after the occurrence of) a password change, which means
+                // it can't perform a traditional logout. Its worth nothing that
                 // we're okay with this scenario because a password change will
                 // delete all previously issued tokens.
             }
@@ -2905,11 +3456,21 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Map<String, T>> call() throws Exception {
-                    Map<Long, Map<String, TObject>> raw = client
-                            .getKeysRecordsTime(Collections.toList(keys),
-                                    Collections.toLongList(records),
-                                    timestamp.getMicros(), creds, transaction,
-                                    environment);
+                    Map<Long, Map<String, TObject>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.getKeysRecordsTimestr(
+                                Collections.toList(keys),
+                                Collections.toLongList(records),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.getKeysRecordsTime(
+                                Collections.toList(keys),
+                                Collections.toLongList(records),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Map<String, T>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, TObject>> entry : raw
@@ -2960,12 +3521,21 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Map<String, T>> call() throws Exception {
-                    Map<Long, Map<String, TObject>> raw = client
-                            .getKeysCriteriaTime(
-                                    Collections.toList(keys),
-                                    Language.translateToThriftCriteria(criteria),
-                                    timestamp.getMicros(), creds, transaction,
-                                    environment);
+                    Map<Long, Map<String, TObject>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.getKeysCriteriaTimestr(
+                                Collections.toList(keys),
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.getKeysCriteriaTime(
+                                Collections.toList(keys),
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Map<String, T>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, TObject>> entry : raw
@@ -3013,10 +3583,19 @@ public abstract class Concourse implements AutoCloseable {
                 @SuppressWarnings("unchecked")
                 @Override
                 public Map<String, T> call() throws Exception {
-                    Map<String, TObject> raw = client.getKeysRecordTime(
-                            Collections.toList(keys), record,
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<String, TObject> raw;
+                    if(timestamp.isString()) {
+                        raw = client.getKeysRecordTimestr(
+                                Collections.toList(keys), record,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.getKeysRecordTime(
+                                Collections.toList(keys), record,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<String, T> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Key", "Value");
                     for (Entry<String, TObject> entry : raw.entrySet()) {
@@ -3086,10 +3665,18 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Map<String, T>> call() throws Exception {
-                    Map<Long, Map<String, TObject>> raw = client
-                            .getKeysCclTime(Collections.toList(keys), ccl,
-                                    timestamp.getMicros(), creds, transaction,
-                                    environment);
+                    Map<Long, Map<String, TObject>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.getKeysCclTimestr(
+                                Collections.toList(keys), ccl,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.getKeysCclTime(Collections.toList(keys),
+                                ccl, timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Map<String, T>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, TObject>> entry : raw
@@ -3138,11 +3725,19 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Map<String, T>> call() throws Exception {
-                    Map<Long, Map<String, TObject>> raw = client
-                            .getCriteriaTime(Language
-                                    .translateToThriftCriteria(criteria),
-                                    timestamp.getMicros(), creds, transaction,
-                                    environment);
+                    Map<Long, Map<String, TObject>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.getCriteriaTimestr(
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.getCriteriaTime(
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Map<String, T>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, TObject>> entry : raw
@@ -3237,10 +3832,19 @@ public abstract class Concourse implements AutoCloseable {
                 @SuppressWarnings("unchecked")
                 @Override
                 public Map<Long, T> call() throws Exception {
-                    Map<Long, TObject> raw = client.getKeyRecordsTime(key,
-                            Collections.toLongList(records),
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<Long, TObject> raw;
+                    if(timestamp.isString()) {
+                        raw = client.getKeyRecordsTimestr(key,
+                                Collections.toLongList(records),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.getKeyRecordsTime(key,
+                                Collections.toLongList(records),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, T> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Record", key);
                     for (Entry<Long, TObject> entry : raw.entrySet()) {
@@ -3283,10 +3887,19 @@ public abstract class Concourse implements AutoCloseable {
                 @SuppressWarnings("unchecked")
                 @Override
                 public Map<Long, T> call() throws Exception {
-                    Map<Long, TObject> raw = client.getKeyCriteriaTime(key,
-                            Language.translateToThriftCriteria(criteria),
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<Long, TObject> raw;
+                    if(timestamp.isString()) {
+                        raw = client.getKeyCriteriaTimestr(key,
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.getKeyCriteriaTime(key,
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, T> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Record", key);
                     for (Entry<Long, TObject> entry : raw.entrySet()) {
@@ -3326,9 +3939,17 @@ public abstract class Concourse implements AutoCloseable {
                 @SuppressWarnings("unchecked")
                 @Override
                 public T call() throws Exception {
-                    TObject raw = client.getKeyRecordTime(key, record,
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    TObject raw;
+                    if(timestamp.isString()) {
+                        raw = client.getKeyRecordTimestr(key, record,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.getKeyRecordTime(key, record,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     return raw == TObject.NULL ? null : (T) Convert
                             .thriftToJava(raw);
 
@@ -3389,9 +4010,17 @@ public abstract class Concourse implements AutoCloseable {
                 @SuppressWarnings("unchecked")
                 @Override
                 public Map<Long, T> call() throws Exception {
-                    Map<Long, TObject> raw = client.getKeyCclTime(key, ccl,
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<Long, TObject> raw;
+                    if(timestamp.isString()) {
+                        raw = client.getKeyCclTimestr(key, ccl,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.getKeyCclTime(key, ccl,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, T> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Record", key);
                     for (Entry<Long, TObject> entry : raw.entrySet()) {
@@ -3411,9 +4040,15 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Map<String, T>> call() throws Exception {
-                    Map<Long, Map<String, TObject>> raw = client.getCclTime(
-                            ccl, timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<Long, Map<String, TObject>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.getCclTimestr(ccl, timestamp.toString(),
+                                creds, transaction, environment);
+                    }
+                    else {
+                        raw = client.getCclTime(ccl, timestamp.getMicros(),
+                                creds, transaction, environment);
+                    }
                     Map<Long, Map<String, T>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, TObject>> entry : raw
@@ -3541,10 +4176,18 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public String call() throws Exception {
-                    return client.jsonifyRecordsTime(
-                            Collections.toLongList(records),
-                            timestamp.getMicros(), identifier, creds,
-                            transaction, environment);
+                    if(timestamp.isString()) {
+                        return client.jsonifyRecordsTimestr(
+                                Collections.toLongList(records),
+                                timestamp.toString(), identifier, creds,
+                                transaction, environment);
+                    }
+                    else {
+                        return client.jsonifyRecordsTime(
+                                Collections.toLongList(records),
+                                timestamp.getMicros(), identifier, creds,
+                                transaction, environment);
+                    }
                 }
 
             });
@@ -3657,10 +4300,19 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Void call() throws Exception {
-                    client.revertKeysRecordsTime(Collections.toList(keys),
-                            Collections.toLongList(records),
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    if(timestamp.isString()) {
+                        client.revertKeysRecordsTimestr(
+                                Collections.toList(keys),
+                                Collections.toLongList(records),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        client.revertKeysRecordsTime(Collections.toList(keys),
+                                Collections.toLongList(records),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     return null;
                 }
 
@@ -3674,9 +4326,17 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Void call() throws Exception {
-                    client.revertKeysRecordTime(Collections.toList(keys),
-                            record, timestamp.getMicros(), creds, transaction,
-                            environment);
+                    if(timestamp.isString()) {
+                        client.revertKeysRecordTimestr(
+                                Collections.toList(keys), record,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        client.revertKeysRecordTime(Collections.toList(keys),
+                                record, timestamp.getMicros(), creds,
+                                transaction, environment);
+                    }
                     return null;
                 }
 
@@ -3691,10 +4351,18 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Void call() throws Exception {
-                    client.revertKeyRecordsTime(key,
-                            Collections.toLongList(records),
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    if(timestamp.isString()) {
+                        client.revertKeyRecordsTimestr(key,
+                                Collections.toLongList(records),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        client.revertKeyRecordsTime(key,
+                                Collections.toLongList(records),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     return null;
                 }
 
@@ -3709,9 +4377,16 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Void call() throws Exception {
-                    client.revertKeyRecordTime(key, record,
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    if(timestamp.isString()) {
+                        client.revertKeyRecordTimestr(key, record,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        client.revertKeyRecordTime(key, record,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     return null;
                 }
 
@@ -3765,10 +4440,19 @@ public abstract class Concourse implements AutoCloseable {
                 @Override
                 public Map<Long, Map<String, Set<Object>>> call()
                         throws Exception {
-                    Map<Long, Map<String, Set<TObject>>> raw = client
-                            .selectRecordsTime(Collections.toLongList(records),
-                                    timestamp.getMicros(), creds, transaction,
-                                    environment);
+                    Map<Long, Map<String, Set<TObject>>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectRecordsTimestr(
+                                Collections.toLongList(records),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectRecordsTime(
+                                Collections.toLongList(records),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Map<String, Set<Object>>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, Set<TObject>>> entry : raw
@@ -3817,11 +4501,21 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Map<String, Set<T>>> call() throws Exception {
-                    Map<Long, Map<String, Set<TObject>>> raw = client
-                            .selectKeysRecordsTime(Collections.toList(keys),
-                                    Collections.toLongList(records),
-                                    timestamp.getMicros(), creds, transaction,
-                                    environment);
+                    Map<Long, Map<String, Set<TObject>>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectKeysRecordsTimestr(
+                                Collections.toList(keys),
+                                Collections.toLongList(records),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectKeysRecordsTime(
+                                Collections.toList(keys),
+                                Collections.toLongList(records),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Map<String, Set<T>>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, Set<TObject>>> entry : raw
@@ -3872,12 +4566,21 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Map<String, Set<T>>> call() throws Exception {
-                    Map<Long, Map<String, Set<TObject>>> raw = client
-                            .selectKeysCriteriaTime(
-                                    Collections.toList(keys),
-                                    Language.translateToThriftCriteria(criteria),
-                                    timestamp.getMicros(), creds, transaction,
-                                    environment);
+                    Map<Long, Map<String, Set<TObject>>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectKeysCriteriaTimestr(
+                                Collections.toList(keys),
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectKeysCriteriaTime(
+                                Collections.toList(keys),
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Map<String, Set<T>>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, Set<TObject>>> entry : raw
@@ -3923,10 +4626,19 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<String, Set<T>> call() throws Exception {
-                    Map<String, Set<TObject>> raw = client
-                            .selectKeysRecordTime(Collections.toList(keys),
-                                    record, timestamp.getMicros(), creds,
-                                    transaction, environment);
+                    Map<String, Set<TObject>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectKeysRecordTimestr(
+                                Collections.toList(keys), record,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectKeysRecordTime(
+                                Collections.toList(keys), record,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<String, Set<T>> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Key", "Values");
                     for (Entry<String, Set<TObject>> entry : raw.entrySet()) {
@@ -3998,10 +4710,19 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Map<String, Set<T>>> call() throws Exception {
-                    Map<Long, Map<String, Set<TObject>>> raw = client
-                            .selectKeysCclTime(Collections.toList(keys), ccl,
-                                    timestamp.getMicros(), creds, transaction,
-                                    environment);
+                    Map<Long, Map<String, Set<TObject>>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectKeysCclTimestr(
+                                Collections.toList(keys), ccl,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectKeysCclTime(
+                                Collections.toList(keys), ccl,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Map<String, Set<T>>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, Set<TObject>>> entry : raw
@@ -4049,11 +4770,19 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Map<String, Set<T>>> call() throws Exception {
-                    Map<Long, Map<String, Set<TObject>>> raw = client
-                            .selectCriteriaTime(Language
-                                    .translateToThriftCriteria(criteria),
-                                    timestamp.getMicros(), creds, transaction,
-                                    environment);
+                    Map<Long, Map<String, Set<TObject>>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectCriteriaTimestr(
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectCriteriaTime(
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Map<String, Set<T>>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, Set<TObject>>> entry : raw
@@ -4095,9 +4824,17 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<String, Set<Object>> call() throws Exception {
-                    Map<String, Set<TObject>> raw = client.selectRecordTime(
-                            record, timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<String, Set<TObject>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectRecordTimestr(record,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectRecordTime(record,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<String, Set<Object>> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Key", "Values");
                     for (Entry<String, Set<TObject>> entry : raw.entrySet()) {
@@ -4185,10 +4922,19 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Set<T>> call() throws Exception {
-                    Map<Long, Set<TObject>> raw = client.selectKeyRecordsTime(
-                            key, Collections.toLongList(records),
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<Long, Set<TObject>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectKeyRecordsTimestr(key,
+                                Collections.toLongList(records),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectKeyRecordsTime(key,
+                                Collections.toLongList(records),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Set<T>> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Record", key);
                     for (Entry<Long, Set<TObject>> entry : raw.entrySet()) {
@@ -4232,10 +4978,19 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Set<T>> call() throws Exception {
-                    Map<Long, Set<TObject>> raw = client.selectKeyCriteriaTime(
-                            key, Language.translateToThriftCriteria(criteria),
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<Long, Set<TObject>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectKeyCriteriaTimestr(key,
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectKeyCriteriaTime(key,
+                                Language.translateToThriftCriteria(criteria),
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Set<T>> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Record", key);
                     for (Entry<Long, Set<TObject>> entry : raw.entrySet()) {
@@ -4271,9 +5026,17 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Set<T> call() throws Exception {
-                    Set<TObject> values = client.selectKeyRecordTime(key,
-                            record, timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Set<TObject> values;
+                    if(timestamp.isString()) {
+                        values = client.selectKeyRecordTimestr(key, record,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        values = client.selectKeyRecordTime(key, record,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     return Transformers.transformSet(values,
                             Conversions.<T> thriftToJavaCasted());
                 }
@@ -4333,9 +5096,17 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Set<T>> call() throws Exception {
-                    Map<Long, Set<TObject>> raw = client.selectKeyCclTime(key,
-                            ccl, timestamp.getMicros(), creds, transaction,
-                            environment);
+                    Map<Long, Set<TObject>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectKeyCclTimestr(key, ccl,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectKeyCclTime(key, ccl,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                     Map<Long, Set<T>> pretty = PrettyLinkedHashMap
                             .newPrettyLinkedHashMap("Record", key);
                     for (Entry<Long, Set<TObject>> entry : raw.entrySet()) {
@@ -4356,9 +5127,16 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Map<Long, Map<String, Set<T>>> call() throws Exception {
-                    Map<Long, Map<String, Set<TObject>>> raw = client
-                            .selectCclTime(ccl, timestamp.getMicros(), creds,
-                                    transaction, environment);
+                    Map<Long, Map<String, Set<TObject>>> raw;
+                    if(timestamp.isString()) {
+                        raw = client.selectCclTimestr(ccl,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        raw = client.selectCclTime(ccl, timestamp.getMicros(),
+                                creds, transaction, environment);
+                    }
                     Map<Long, Map<String, Set<T>>> pretty = PrettyLinkedTableMap
                             .newPrettyLinkedTableMap("Record");
                     for (Entry<Long, Map<String, Set<TObject>>> entry : raw
@@ -4476,10 +5254,18 @@ public abstract class Concourse implements AutoCloseable {
 
                 @Override
                 public Boolean call() throws Exception {
-                    return client.verifyKeyValueRecordTime(key,
-                            Convert.javaToThrift(value), record,
-                            timestamp.getMicros(), creds, transaction,
-                            environment);
+                    if(timestamp.isString()) {
+                        return client.verifyKeyValueRecordTimestr(key,
+                                Convert.javaToThrift(value), record,
+                                timestamp.toString(), creds, transaction,
+                                environment);
+                    }
+                    else {
+                        return client.verifyKeyValueRecordTime(key,
+                                Convert.javaToThrift(value), record,
+                                timestamp.getMicros(), creds, transaction,
+                                environment);
+                    }
                 }
 
             });

@@ -16,7 +16,8 @@
 package com.cinchapi.concourse.util;
 
 import java.util.List;
-
+import java.util.Queue;
+import java.util.Set;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -25,6 +26,7 @@ import com.cinchapi.concourse.test.Variables;
 import com.cinchapi.concourse.util.Random;
 import com.cinchapi.concourse.util.StringSplitter;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Unit tests for the {@link StringSplitter} class.
@@ -57,9 +59,9 @@ public class StringSplitterTest extends ConcourseBaseTest {
     public void testStringSplitterReproC() {
         doTestStringSplitter("yj6", 'y');
     }
-    
+
     @Test
-    public void testStringSplitterBackToBackDelims(){
+    public void testStringSplitterBackToBackDelims() {
         doTestStringSplitter("w  8", ' ');
     }
 
@@ -84,4 +86,172 @@ public class StringSplitterTest extends ConcourseBaseTest {
         Assert.assertEquals(expected, actual);
     }
 
+    @Test
+    public void testSplitOnNewlineEnabled() {
+        StringSplitter splitter = new StringSplitter("foo", 'o',
+                SplitOption.SPLIT_ON_NEWLINE);
+        Assert.assertTrue(SplitOption.SPLIT_ON_NEWLINE.isEnabled(splitter));
+        splitter = new StringSplitter("foo", 'o');
+        Assert.assertFalse(SplitOption.SPLIT_ON_NEWLINE.isEnabled(splitter));
+    }
+
+    @Test
+    public void testSplitOnNewlineLF() {
+        Set<String> expected = Sets.newHashSet("line1", "line2", "line3");
+        String string = Strings.join('\n', expected.toArray());
+        StringSplitter it = new StringSplitter(string,
+                SplitOption.SPLIT_ON_NEWLINE);
+        while (it.hasNext()) {
+            Assert.assertTrue(expected.contains(it.next()));
+        }
+    }
+
+    @Test
+    public void testSplitOnNewlineCR() {
+        Set<String> expected = Sets.newHashSet("line1", "line2", "line3");
+        String string = Strings.join('\r', expected.toArray());
+        StringSplitter it = new StringSplitter(string,
+                SplitOption.SPLIT_ON_NEWLINE);
+        while (it.hasNext()) {
+            Assert.assertTrue(expected.contains(it.next()));
+        }
+    }
+
+    @Test
+    public void testSplitOnNewlineCRLF() {
+        Set<String> expected = Sets.newHashSet("line1", "line2", "line3");
+        String string = Strings.join("\r\n", expected.toArray());
+        StringSplitter it = new StringSplitter(string,
+                SplitOption.SPLIT_ON_NEWLINE);
+        while (it.hasNext()) {
+            Assert.assertTrue(expected.contains(it.next()));
+        }
+    }
+
+    @Test
+    public void testSplitOnCommaAndNewline() {
+        String string = "a,b,c\n1,2,3\n4,5,6\n";
+        StringSplitter it = new StringSplitter(string, ',',
+                SplitOption.SPLIT_ON_NEWLINE);
+        Assert.assertEquals("a", it.next());
+        Assert.assertEquals("b", it.next());
+        Assert.assertEquals("c", it.next());
+        Assert.assertEquals("1", it.next());
+        Assert.assertEquals("2", it.next());
+        Assert.assertEquals("3", it.next());
+        Assert.assertEquals("4", it.next());
+        Assert.assertEquals("5", it.next());
+        Assert.assertEquals("6", it.next());
+    }
+
+    @Test
+    public void testTokenizeParenthesisAndDelimeterBackToBack() {
+        String string = "foo(bar),baz ,,()(bang,";
+        StringSplitter it = new StringSplitter(string, ',',
+                SplitOption.TOKENIZE_PARENTHESIS);
+        Assert.assertEquals("foo", it.next());
+        Assert.assertEquals("(", it.next());
+        Assert.assertEquals("bar", it.next());
+        Assert.assertEquals(")", it.next());
+        Assert.assertEquals("baz ", it.next());
+        Assert.assertEquals("", it.next());
+        Assert.assertEquals("(", it.next());
+        Assert.assertEquals(")", it.next());
+        Assert.assertEquals("(", it.next());
+        Assert.assertEquals("bang", it.next());
+    }
+
+    @Test
+    public void testTokenizeParenthesis() {
+        String string = "foo(bar)";
+        StringSplitter it = new StringSplitter(string,
+                SplitOption.TOKENIZE_PARENTHESIS);
+        while (it.hasNext()) {
+            Assert.assertEquals("foo", it.next());
+            Assert.assertEquals("(", it.next());
+            Assert.assertEquals("bar", it.next());
+            Assert.assertEquals(")", it.next());
+        }
+    }
+
+    @Test
+    public void testEndOfLineLF() {
+        String string = "a b c\n\nd e f";
+        StringSplitter it = new StringSplitter(string, ' ',
+                SplitOption.SPLIT_ON_NEWLINE);
+        Queue<String> queue = Queues.newSingleThreadedQueue();
+        queue.offer("a");
+        queue.offer("b");
+        queue.offer("c");
+        queue.offer("");
+        queue.offer("d");
+        queue.offer("e");
+        queue.offer("f");
+        while (it.hasNext()) {
+            String expected = queue.poll();
+            Assert.assertEquals(expected, it.next());
+            if(expected.equals("c") || expected.equals("")) {
+                Assert.assertTrue(it.atEndOfLine());
+                Assert.assertTrue(it.atEndOfLine());
+            }
+            else {
+                Assert.assertFalse(it.atEndOfLine());
+                Assert.assertFalse(it.atEndOfLine());
+            }
+        }
+    }
+
+    @Test
+    public void testEndOfLineCR() {
+        String string = "a b c\r\rd e f";
+        StringSplitter it = new StringSplitter(string, ' ',
+                SplitOption.SPLIT_ON_NEWLINE);
+        Queue<String> queue = Queues.newSingleThreadedQueue();
+        queue.offer("a");
+        queue.offer("b");
+        queue.offer("c");
+        queue.offer("");
+        queue.offer("d");
+        queue.offer("e");
+        queue.offer("f");
+        while (it.hasNext()) {
+            String expected = queue.poll();
+            Assert.assertEquals(expected, it.next());
+            if(expected.equals("c") || expected.equals("")) {
+                Assert.assertTrue(it.atEndOfLine());
+                Assert.assertTrue(it.atEndOfLine());
+            }
+            else {
+                Assert.assertFalse(it.atEndOfLine());
+                Assert.assertFalse(it.atEndOfLine());
+            }
+        }
+    }
+
+    @Test
+    public void testEndOfLineCRLF() {
+        String string = "a b c\r\n\r\nd e f";
+        StringSplitter it = new StringSplitter(string, ' ',
+                SplitOption.SPLIT_ON_NEWLINE);
+        Queue<String> queue = Queues.newSingleThreadedQueue();
+        queue.offer("a");
+        queue.offer("b");
+        queue.offer("c");
+        queue.offer("");
+        queue.offer("d");
+        queue.offer("e");
+        queue.offer("f");
+        while (it.hasNext()) {
+            String expected = queue.poll();
+            Assert.assertEquals(expected, it.next());
+            if(expected.equals("c") || expected.equals("")) {
+                Assert.assertTrue(it.atEndOfLine());
+                Assert.assertTrue(it.atEndOfLine());
+            }
+            else {
+                Assert.assertFalse(it.atEndOfLine());
+                Assert.assertFalse(it.atEndOfLine());
+            }
+        }
+    }
 }

@@ -19,7 +19,9 @@ import static com.cinchapi.concourse.util.Convert.RAW_RESOLVABLE_LINK_SYMBOL_APP
 import static com.cinchapi.concourse.util.Convert.RAW_RESOLVABLE_LINK_SYMBOL_PREPEND;
 
 import java.text.MessageFormat;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
@@ -33,7 +35,11 @@ import com.cinchapi.concourse.util.Convert;
 import com.cinchapi.concourse.util.Random;
 import com.cinchapi.concourse.util.Strings;
 import com.cinchapi.concourse.util.Convert.ResolvableLink;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.LinkedHashMultimap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.gson.JsonParseException;
@@ -60,7 +66,7 @@ public class ConvertTest {
         Convert.jsonToJava("[\"a\",\"b\",\"c\"]");
     }
 
-    @Test(expected = UnsupportedOperationException.class)
+    @Test(expected = JsonParseException.class)
     public void testCannotConvertJsonStringWithEmbeddedObject() {
         Convert.jsonToJava("{\"key\": {\"a\": 1}}");
     }
@@ -263,17 +269,31 @@ public class ConvertTest {
     }
 
     @Test
+    public void testConvertJsonStringNumberReproA() {
+        Number value = 0.5907014118838035;
+        String json = "{\"elt\": \"" + value + "\"}";
+        Multimap<String, Object> data = Convert.jsonToJava(json);
+        Assert.assertEquals("" + value + "",
+                Iterables.getOnlyElement(data.get("elt")));
+    }
+
+    @Test
     public void testConvertLinkFromIntValue() {
         // A int/long that is wrapped between two at (@) symbols must always
         // convert to a Link
         Number number = Random.getInt();
-        String value = MessageFormat
-                .format("{0}{1}{0}", "@", number.toString()); // must use
-                                                              // number.toString()
-                                                              // so comma
-                                                              // separators are
-                                                              // not added to
-                                                              // the output
+        String value = MessageFormat.format("{0}{1}", "@", number.toString()); // must
+                                                                               // use
+                                                                               // number.toString()
+                                                                               // so
+                                                                               // comma
+                                                                               // separators
+                                                                               // are
+                                                                               // not
+                                                                               // added
+                                                                               // to
+                                                                               // the
+                                                                               // output
         Link link = (Link) Convert.stringToJava(value);
         Assert.assertEquals(number.intValue(), link.intValue());
     }
@@ -283,13 +303,18 @@ public class ConvertTest {
         // A int/long that is wrapped between two at (@) symbols must always
         // convert to a Link
         Number number = Random.getLong();
-        String value = MessageFormat
-                .format("{0}{1}{0}", "@", number.toString()); // must use
-                                                              // number.toString()
-                                                              // so comma
-                                                              // separators are
-                                                              // not added to
-                                                              // the output
+        String value = MessageFormat.format("{0}{1}", "@", number.toString()); // must
+                                                                               // use
+                                                                               // number.toString()
+                                                                               // so
+                                                                               // comma
+                                                                               // separators
+                                                                               // are
+                                                                               // not
+                                                                               // added
+                                                                               // to
+                                                                               // the
+                                                                               // output
         Link link = (Link) Convert.stringToJava(value);
         Assert.assertEquals(number.longValue(), link.longValue());
     }
@@ -484,9 +509,9 @@ public class ConvertTest {
         String symbol = "lnk2";
         Assert.assertEquals(Convert.stringToOperator(symbol), Operator.LINKS_TO);
     }
-    
+
     @Test
-    public void testStringLnks2ToOperatorLinksTo(){
+    public void testStringLnks2ToOperatorLinksTo() {
         String symbol = "lnks2";
         Assert.assertEquals(Convert.stringToOperator(symbol), Operator.LINKS_TO);
     }
@@ -502,6 +527,122 @@ public class ConvertTest {
         String symbol = "nregex";
         Assert.assertEquals(Convert.stringToOperator(symbol),
                 Operator.NOT_REGEX);
+    }
+
+    @Test
+    public void testConvertMapToJson() {
+        Map<String, Collection<Object>> map = Maps.newHashMap();
+        Set<Object> aValues = Sets.newHashSet();
+        Set<Object> bValues = Sets.newHashSet();
+        Set<Object> cValues = Sets.newHashSet();
+        aValues.add(1);
+        aValues.add("1");
+        aValues.add(1.00);
+        bValues.add(true);
+        cValues.add("hello");
+        cValues.add("hello world");
+        map.put("a", aValues);
+        map.put("b", bValues);
+        map.put("c", cValues);
+        String expected = "{\"b\":true,\"c\":[\"hello\",\"hello world\"],\"a\":[1,\"1\",\"1.0D\"]}";
+        Assert.assertEquals(expected, Convert.mapToJson(map));
+    }
+
+    @Test
+    public void testConvertMapWithEmptyCollectionToJson() {
+        // This test is here to document the current practice of output an
+        // emptying JSON array when converting empty collections. If, in the
+        // future, we decide to output null, this test should be updated to
+        // reflect that.
+        Map<String, Collection<Object>> map = Maps.newHashMap();
+        Set<Object> aValues = Sets.newHashSet();
+        Set<Object> bValues = Sets.newHashSet();
+        Set<Object> cValues = Sets.newHashSet();
+        aValues.add(1);
+        aValues.add("1");
+        aValues.add(1.00);
+        bValues.add(true);
+        map.put("a", aValues);
+        map.put("b", bValues);
+        map.put("c", cValues);
+        String expected = "{\"b\":true,\"c\":[],\"a\":[1,\"1\",\"1.0D\"]}";
+        Assert.assertEquals(expected, Convert.mapToJson(map));
+    }
+
+    @Test
+    public void testConvertMultimapToJson() {
+        Multimap<String, Object> map = LinkedHashMultimap.create();
+        map.put("a", 1);
+        map.put("a", "1");
+        map.put("a", 1.00);
+        map.put("b", true);
+        map.put("c", "hello");
+        map.put("c", "hello world");
+        String expected = "{\"a\":[1,\"1\",\"1.0D\"],\"b\":true,\"c\":[\"hello\",\"hello world\"]}";
+        Assert.assertEquals(expected, Convert.mapToJson(map));
+    }
+
+    @Test
+    public void testConvertStringLinkToJava() {
+        long record = Random.getLong();
+        String strLink = "@" + record;
+        Link link = (Link) Convert.stringToJava(strLink);
+        Assert.assertEquals(record, link.longValue());
+    }
+
+    @Test
+    public void testConvertJsonWithMasqueradingDouble() {
+        String json = "{\"double\": \"3.14D\"}";
+        Multimap<String, Object> converted = Convert.jsonToJava(json);
+        Assert.assertEquals(3.14, converted.get("double").iterator().next());
+    }
+
+    @Test
+    public void testConvertMapsToJson() {
+        List<Multimap<String, Object>> list = Lists.newArrayList();
+        Multimap<String, Object> a = LinkedHashMultimap.create();
+        Multimap<String, Object> b = LinkedHashMultimap.create();
+        Multimap<String, Object> c = LinkedHashMultimap.create();
+        a.put("a", 1);
+        a.put("b", 2);
+        a.put("c", 3);
+        b.put("a", "a");
+        b.put("a", 1);
+        b.put("b", "b");
+        b.put("b", 2);
+        b.put("c", 3);
+        b.put("c", "c");
+        c.put("a", true);
+        c.put("a", false);
+        c.put("a", 1.1);
+        c.put("b", 3.14);
+        c.put("b", "hello");
+        c.put("b", "world");
+        c.put("c", "me");
+        c.put("c", 0);
+        c.put("c", 4L);
+        list.add(a);
+        list.add(b);
+        list.add(c);
+        Assert.assertEquals(
+                "[{\"a\":1,\"b\":2,\"c\":3},{\"a\":[\"a\",1],\"b\":[\"b\",2],\"c\":[3,\"c\"]},{\"a\":[true,false,\"1.1D\"],\"b\":[\"3.14D\",\"hello\",\"world\"],\"c\":[\"me\",0,4]}]",
+                Convert.mapsToJson(list));
+    }
+
+    @Test
+    public void testMultimapWithLinkObjectToJson() {
+        Multimap<String, Object> data = HashMultimap.create();
+        data.put("foo", Link.to(1));
+        String json = Convert.mapToJson(data);
+        Assert.assertEquals("{\"foo\":\"@1\"}", json);
+    }
+
+    @Test
+    public void testMapWithLinkObjectToJson() { // GH-120
+        Map<String, Object> data = Maps.newHashMap();
+        data.put("foo", Link.to(1));
+        String json = Convert.mapToJson(data);
+        Assert.assertEquals("{\"foo\":\"@1\"}", json);
     }
 
     /**

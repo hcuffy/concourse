@@ -190,6 +190,7 @@ class Mockcourse implements ConcourseService.Iface {
             String environment) throws SecurityException,
             TransactionException, TException {
         txnStart = null;
+        return true;
     }
 
     @Override
@@ -373,16 +374,37 @@ class Mockcourse implements ConcourseService.Iface {
       else if(value instanceof Tag) {
         bytes = ByteBuffer.wrap(value.toString().getBytes(
           StandardCharsets.UTF_8));
-          type = Type.TAG;
+        type = Type.TAG;
+      }
+      else if(value.toString().matches('^@[-]{0,1}[0-9]+$')){
+        value = Long.parseLong(value.toString().substring(1,
+          value.toString().length()));
+        bytes = ByteBuffer.allocate(8);
+        bytes.putLong((long) value);
+        type = Type.LINK;
+      }
+      else if(value.toString().matches('^@.+@$')){
+          String ccl = value.toString().substring(1, value.toString().length() - 1)
+          Set<Long> items = findCcl(ccl, creds, transaction, environment);
+          for(long item : items){
+              Map<String, Object> data0 = new HashMap<String, Object>();
+              data0.put(key, Link.to(item));
+              if(!doInsert(data0, record, creds, transaction, environment)){
+                allGood = false;
+              }
+              continue;
+          }
       }
       else {
         bytes = ByteBuffer.wrap(value.toString().getBytes(
           StandardCharsets.UTF_8));
-          type = Type.STRING;
-        }
-      bytes.rewind();
-      if(!addKeyValueRecord(key, new TObject(bytes, type), record, creds, transaction, environment)){
-        allGood = false;
+        type = Type.STRING;
+      }
+      if(bytes != null){
+          bytes.rewind();
+          if(!addKeyValueRecord(key, new TObject(bytes, type), record, creds, transaction, environment)){
+              allGood = false;
+          }
       }
     }
     return allGood;

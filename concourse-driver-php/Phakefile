@@ -59,8 +59,17 @@ task('clean', function(){
 });
 
 desc("Run the unit tests.");
-task('test', function(){
-    system("./vendor/phpunit/phpunit/phpunit tests/", $status);
+task('test', function($args){
+    $class = $args['class'];
+    $extra = "";
+    if(!empty($class)) {
+        $class = explode('/', $class);
+        $class = $class[count($class)-1];
+        $class = explode(".php", $class)[0];
+        $extra.= " --filter $class";
+    }
+    $extra = trim($extra);
+    system("./vendor/phpunit/phpunit/phpunit $extra tests/", $status);
     if($status != 0) {
         throw new Exception("Unit test failure!");
     }
@@ -89,7 +98,9 @@ task('upload-packagist', 'check-syntax', 'test', 'docs', function($args) {
     'composer.json',
     'composer.lock',
     'README.md',
-    'build/docs' => 'docs'];
+    'build/docs' => 'docs',
+    '../LICENSE' => 'LICENSE.txt'
+    ];
 
     // The version can be passed to the build if phake is invoked with
     // version=<version>. If no version is passed, then phake will get the

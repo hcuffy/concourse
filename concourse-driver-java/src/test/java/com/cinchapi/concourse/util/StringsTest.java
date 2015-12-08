@@ -20,6 +20,7 @@ import java.util.Arrays;
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.cinchapi.concourse.test.Variables;
 import com.cinchapi.concourse.util.Random;
 import com.cinchapi.concourse.util.Strings;
 import com.google.common.collect.Lists;
@@ -50,6 +51,7 @@ public class StringsTest {
                 Arrays.toString(splitted));
     }
 
+    @SuppressWarnings("deprecation")
     @Test
     public void testSplitWithSingleQuotes() {
         String string = "John said 'hello world'";
@@ -91,17 +93,129 @@ public class StringsTest {
                 Lists.newArrayList("test", "Split", "Camel", "Case"),
                 Strings.splitCamelCase(str));
         str = "SplitCamelCase";
-        Assert.assertEquals(
-                Lists.newArrayList("Split", "Camel", "Case"),
+        Assert.assertEquals(Lists.newArrayList("Split", "Camel", "Case"),
                 Strings.splitCamelCase(str));
         str = "Splitcamelcase";
-        Assert.assertEquals(
-                Lists.newArrayList("Splitcamelcase"),
+        Assert.assertEquals(Lists.newArrayList("Splitcamelcase"),
                 Strings.splitCamelCase(str));
         str = "splitcamelcase";
-        Assert.assertEquals(
-                Lists.newArrayList("splitcamelcase"),
+        Assert.assertEquals(Lists.newArrayList("splitcamelcase"),
                 Strings.splitCamelCase(str));
+    }
+
+    @Test
+    public void testFormat() {
+        String pattern = "This is a string {} that needs to have {} some random {} substitution";
+        Object a = Random.getObject();
+        Object b = Random.getObject();
+        Object c = Random.getObject();
+        String expected = "This is a string " + a + " that needs to have " + b
+                + " some random " + c + " substitution";
+        String actual = Strings.format(pattern, a, b, c);
+        Assert.assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testIsSubStringReproA() {
+        Assert.assertTrue(Strings
+                .isSubString(
+                        "qrqq40 078rh2n75kxu4prmgtlehv85iksxgehj5jk2prq66ls9bj2f6g5onx l18sgp7x414cik9tvpfycmhjgwhy9d3yhw4we",
+                        "b6r4e7g8f8sgu1cjfo16rg711cmft76wh83dsf46wwz3fse5j9chut37nhamqm4iw2f37ebl8tqr4fjmx8n6t943s4khdsf1qrqrqq40 078rh2n75kxu4prmgtlehv85iksxgehj5jk2prq66ls9bj2f6g5onx l18sgp7x414cik9tvpfycmhjgwhy9d3yhw4web6r4e7g8f8sgu1cjfo16rg711cmft76wh83dsf46wwz3fse5j9chut37nhamqm4iw2f37ebl8tqr4fjmx8n6t943s4khdsf1qr"));
+    }
+
+    @Test
+    public void testIsSubString() {
+        String needle = Variables.register("needle", Random.getString());
+        String haystack = Variables.register("haystack", Random.getString());
+        Assert.assertEquals(haystack.contains(needle),
+                Strings.isSubString(needle, haystack));
+    }
+
+    @Test
+    public void testIsValidJsonObject() {
+        Assert.assertTrue(Strings
+                .isValidJson("{\"foo\": 1, \"bar\": \"2\", \"baz\":true}"));
+    }
+
+    @Test
+    public void testIsValidJsonArray() {
+        Assert.assertTrue(Strings
+                .isValidJson("[{\"foo\": 1, \"bar\": \"2\", \"baz\":true},{\"foo\": 1, \"bar\": \"2\", \"baz\":true},{\"foo\": 1, \"bar\": \"2\", \"baz\":true}]"));
+    }
+
+    @Test
+    public void testIsValidJsonFalse() {
+        Assert.assertFalse(Strings.isValidJson("foo"));
+        Assert.assertFalse(Strings
+                .isValidJson("{\"foo\": 1, \"bar\": \"2\", \"baz\":}"));
+    }
+
+    @Test
+    public void testTryParseFloat() {
+        float f = 0.3f;
+        Object obj = Strings.tryParseNumber("" + f + "");
+        Assert.assertTrue(obj instanceof Float);
+        Assert.assertEquals(0.3f, obj);
+    }
+
+    @Test
+    public void testTryParseDoubleAsFloat() {
+        double f = 0.3;
+        Object obj = Strings.tryParseNumber("" + f + "");
+        Assert.assertTrue(obj instanceof Float);
+        Assert.assertEquals(0.3f, obj);
+    }
+
+    @Test
+    public void testEscapeInnerDoubleQuote() {
+        String string = "this has a \"double\" quote and 'single' quote";
+        String expected = "this has a \\\"double\\\" quote and 'single' quote";
+        Assert.assertEquals(expected, Strings.escapeInner(string, '"'));
+    }
+
+    @Test
+    public void testEscapeInnerSingleQuote() {
+        String string = "this has a 'single' quote and \"double\" quote";
+        String expected = "this has a \\'single\\' quote and \"double\" quote";
+        Assert.assertEquals(expected, Strings.escapeInner(string, '\''));
+    }
+
+    @Test
+    public void testEscapeInnerNothing() {
+        String string = "this should not be escaped";
+        String expected = string;
+        Assert.assertEquals(expected, Strings.escapeInner(string, '\"'));
+    }
+
+    @Test
+    public void testEscapeInnerSingleAndDoubleQuotes() {
+        String string = "this has a \"double\" and 'single' quote";
+        String expected = "this has a \\\"double\\\" and \\'single\\' quote";
+        Assert.assertEquals(expected, Strings.escapeInner(string, '"', '\''));
+    }
+
+    @Test
+    public void testEscapeInnerNothingSkipHeadTail() {
+        String string = "\"this should not be escaped\"";
+        String expected = string;
+        Assert.assertEquals(expected, Strings.escapeInner(string, '\"'));
+    }
+
+    @Test
+    public void testEscapeInnerDoubleQuoteSkipHeadTail() {
+        String string = "\"this has a \"double\" and 'single' quote\"";
+        String expected = "\"this has a \\\"double\\\" and 'single' quote\"";
+        Assert.assertEquals(expected, Strings.escapeInner(string, '\"'));
+    }
+
+    @Test
+    public void testDoNotParseStringAsNumberWithLeadingZero() {
+        Assert.assertNull(Strings.tryParseNumber("01"));
+    }
+
+    @Test
+    public void testParseStringAsNumberIfDecimalWithLeadingZero() {
+        Assert.assertTrue(Strings.tryParseNumberStrict("0.0123") instanceof Number);
     }
 
 }

@@ -17,10 +17,13 @@ package com.cinchapi.concourse.importer;
 
 import com.cinchapi.concourse.Concourse;
 
+<<<<<<< HEAD
 import com.google.gson.JsonObject;
 
 import ch.qos.logback.classic.Logger;
 
+=======
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
 /**
  * <p>
  * An {@link Importer} that can handle generic CSV files that have header
@@ -50,16 +53,7 @@ import ch.qos.logback.classic.Logger;
  * 
  * @author Jeff Nelson
  */
-public class CsvImporter extends LineBasedImporter {
-
-    /**
-     * Construct a new instance.
-     * 
-     * @param concourse
-     */
-    public CsvImporter(Concourse concourse, Logger log) {
-        super(concourse, log);
-    }
+public class CsvImporter extends DelimitedLineImporter {
 
     /**
      * Construct a new instance.
@@ -71,6 +65,7 @@ public class CsvImporter extends LineBasedImporter {
     }
 
     @Override
+<<<<<<< HEAD
     protected String delimiter() {
         return ",";
     }
@@ -94,6 +89,10 @@ public class CsvImporter extends LineBasedImporter {
 
         }
 
+=======
+    protected char delimiter() {
+        return ',';
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
     }
 
 }

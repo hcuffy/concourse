@@ -18,6 +18,8 @@ package com.cinchapi.concourse.util;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Set;
 
@@ -128,6 +130,11 @@ public class ConcourseCodebase {
     }
 
     /**
+     * The name of the file that contains a cache of the state of the codebase.
+     */
+    private static String CODE_STATE_CACHE_FILENAME = ".codestate";
+
+    /**
      * The URL from which the repo can be cloned
      */
     private static String GITHUB_CLONE_URL = "https://github.com/cinchapi/concourse.git";
@@ -172,17 +179,13 @@ public class ConcourseCodebase {
      */
     public String buildInstaller() {
         try {
-            Process p;
-            p = new ProcessBuilder("bash", "gradlew", "clean", "installer")
-                    .directory(new File(path)).start();
-            Processes.waitForSuccessfulCompletion(p);
-            p = new ProcessBuilder("ls", path
-                    + "/concourse-server/build/distributions").start();
-            Processes.waitForSuccessfulCompletion(p);
-            String installer = Processes.getStdOut(p).get(0);
-            installer = path + "/concourse-server/build/distributions/"
-                    + installer;
-            return installer;
+            if(!hasInstaller() || hasCodeChanged()) {
+                Process p = Processes
+                        .getBuilder("bash", "gradlew", "clean", "installer")
+                        .directory(new File(path)).start();
+                Processes.waitForSuccessfulCompletion(p);
+            }
+            return getInstallerPath();
         }
         catch (Exception e) {
             throw Throwables.propagate(e);
@@ -196,6 +199,76 @@ public class ConcourseCodebase {
      */
     public String getPath() {
         return path;
+    }
+
+    /**
+     * Return the path to the installer file for this codebase or an empty
+     * string if no installer file exists.
+     * 
+     * @return the path to the installer file
+     */
+    private String getInstallerPath() {
+        try {
+            String cmd = new StringBuilder().append("ls -a ").append(path)
+                    .append("/concourse-server/build/distributions | grep bin")
+                    .toString();
+            Process p = Processes.getBuilderWithPipeSupport(cmd).start();
+            try {
+                Processes.waitForSuccessfulCompletion(p);
+                String installer = Processes.getStdOut(p).get(0);
+                if(!installer.isEmpty()) {
+                    installer = path + "/concourse-server/build/distributions/"
+                            + installer;
+                }
+                return installer;
+            }
+            catch (Exception e) {
+                return "";
+            }
+        }
+        catch (Exception e) {
+            throw Throwables.propagate(e);
+        }
+    }
+
+    /**
+     * Check to see if there has been a code change since the last check.
+     * 
+     * @return {@code true} if it appears that the code has changed
+     */
+    private boolean hasCodeChanged() {
+        Path cache = Paths.get(getPath(), CODE_STATE_CACHE_FILENAME)
+                .toAbsolutePath();
+        String cmd = Platform.isMacOsX() ? "(git status; git diff) | md5"
+                : "(git status; git diff) | md5sum";
+        try {
+            Process p = Processes.getBuilderWithPipeSupport(cmd)
+                    .directory(new File(getPath())).start();
+            Processes.waitForSuccessfulCompletion(p);
+            String state = Processes.getStdOut(p).get(0);
+            FileOps.touch(cache.toString());
+            String cached = FileOps.read(cache.toString());
+            boolean changed = false;
+            if(!state.equals(cached)) {
+                FileOps.write(state, cache.toString());
+                changed = true;
+            }
+            return changed;
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
+    }
+
+    /**
+     * Return {@code true} if the codebase has an installer file, {@code false}
+     * otherwise.
+     * 
+     * @return a boolean that indicates whether the codebase has an installer
+     *         file or not
+     */
+    private boolean hasInstaller() {
+        return !getInstallerPath().isEmpty();
     }
 
 }

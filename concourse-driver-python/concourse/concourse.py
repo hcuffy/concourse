@@ -21,10 +21,10 @@ from thrift.transport import TSocket
 from .thriftapi import ConcourseService
 from .thriftapi.shared.ttypes import *
 from .utils import *
+from .json import json_encode
 from collections import OrderedDict
 from io import BytesIO
 from configparser import ConfigParser
-import ujson
 import itertools
 import os
 import types
@@ -196,16 +196,16 @@ class Concourse(object):
         Options:
         -------
         * `add(key, value)` - Append *key* as *value* in a new record.
-            * :param key: [string] the field name
+            * :param key: [str] the field name
             * :param value: [object] the value to add
             * :returns: the new record id
         * `add(key, value, record)` - Append *key* as *value* in *record* if and only if it does not exist.
-            * :param key: [string] the field name
+            * :param key: [str] the field name
             * :param value: [object] the value to add
             * :param record: [integer] the record id where an attempt is made to add the data
             * :returns: a bool that indicates if the data was added
         * `add(key, value, records)` - Append *key* as *value* in each of the *records* where it doesn't exist.
-            * :param key: [string] the field name
+            * :param key: [str] the field name
             * :param value: [object] the value to add
             * :param records: [list] a list of record ids where an attempt is made to add the data
             * :returns: a dict mapping each record id to a boolean that indicates if the data was added in that record
@@ -230,31 +230,47 @@ class Concourse(object):
         Options:
         -------
         * `audit(key, record)` - List all the changes ever made to the *key* field in *record*.
-            * :param key: [string] the field name
+            * :param key: [str] the field name
             * :param record: [long] the record id
+            * :returns a dict containing, for each change, a mapping from timestamp to a description of the change that
+                       occurred
         * `audit(key, record, start)` - List all the changes made to the *key* field in *record* since *start*
-            (non-inclusive).
-            * :param key: [string] the field name
-            * :param record: [string] the record id
-            * :param start: [integer|string] a non-inclusive timestamp that is the starting point of the audit
+            (inclusive).
+            * :param key: [str] the field name
+            * :param record: [str] the record id
+            * :param start: [int|str] an inclusive timestamp for the oldest change that should possibly be included in
+                            the audit
+            * :returns a dict containing, for each change, a mapping from timestamp to a description of the change that
+                       occurred
         * `audit(key, record, start, end)` - List all the changes made to the *key* field in *record* between *start*
-            (non-inclusive) and *end* (inclusive).
-            * :param key: [string] the field name
-            * :param record: [string] the record id
-            * :param start: [integer|string] a non-inclusive timestamp that is the starting point of the audit
-            * :param end: [integer|string] an inclusive timestamp of the most recent change that should possibly be
+            (inclusive) and *end* (non-inclusive).
+            * :param key: [str] the field name
+            * :param record: [str] the record id
+            * :param start: [int|str] an inclusive timestamp for the oldest change that should possibly be included in
+                            the audit
+            * :param end: [int|str] a non-inclusive timestamp for the most recent change that should possibly be
                           included in the audit
+            * :returns a dict containing, for each change, a mapping from timestamp to a description of the change that
+                       occurred
         * `audit(record)` - List all the changes ever made to *record*.
             * :param record: [long] the record id
-        * `audit(record, start)` - List all the changes made to *record* since *start* (non-inclusive).
-            * :param record: [string] the record id
-            * :param start: [integer|string] a non-inclusive timestamp that is the starting point of the audit
-        * `audit(record, start, end)` - List all the changes made to *record* between *start* (non-inclusive) and *end*
-            (inclusive).
-            * :param record: [string] the record id
-            * :param start: [integer|string] a non-inclusive timestamp that is the starting point of the audit
-            * :param end: [integer|string] an inclusive timestamp of the most recent change that should possibly be
+            * :returns a dict containing, for each change, a mapping from timestamp to a description of the change that
+                       occurred
+        * `audit(record, start)` - List all the changes made to *record* since *start* (inclusive).
+            * :param record: [str] the record id
+            * :param start: [int|str] an inclusive timestamp for the oldest change that should possibly be included in
+                            the audit
+            * :returns a dict containing, for each change, a mapping from timestamp to a description of the change that
+                       occurred
+        * `audit(record, start, end)` - List all the changes made to *record* between *start* (inclusive) and *end*
+            (non-inclusive).
+            * :param record: [str] the record id
+            * :param start: [int|str] an inclusive timestamp for the oldest change that should possibly be included in
+                            the audit
+            * :param end: [int|str] a non-inclusive timestamp for the most recent change that should possibly be
                           included in the audit
+            * :returns a dict containing, for each change, a mapping from timestamp to a description of the change that
+                       occurred
 
         """
         start = start or find_in_kwargs_by_alias('timestamp', kwargs)
@@ -294,14 +310,28 @@ class Concourse(object):
         return data
 
     def browse(self, keys=None, timestamp=None, **kwargs):
-        """ Return a view of all the values indexed for a key or group of keys.
+        """ For one or more **fields**, view the values from all records currently or previously stored.
 
-        :param key: string or keys: list
-        :param timestamp:string (optional)
-
-        :return: 1) a dict mapping a value to a set of records containing the value if a single key is specified or
-        2) a dict mapping a key to a dict mapping a value to set of records containing that value of a list of keys
-        is specified
+        Options:
+        -------
+        * `browse(key)` - View the values from all records that are currently stored for *key*.
+            * :param key: [str] - the field name
+            * :returns a dict associating each value to the list of records that contain that value in the *key* field
+        * `browse(key, timestamp)` - View the values from all records that were stored for *key* at _timestamp_.
+            * :param key: [str] - the field name
+            * :param timestamp: [int|str] - the historical timestamp to use in the lookup
+            * :returns a dict associating each value to the list of records that contained that value in the *key*
+                       field at *timestamp*
+        * `browse(keys)` - View the values from all records that are currently stored for each of the *keys*.
+            * :param keys: [list] - a list of field names
+            * :returns a dict associating each key to a dict associating each value to the list of records that contain
+                       that value in the *key* field
+        * `browse(keys, timestamp)` - View the values from all records that were stored for each of the *keys* at
+                                     *timestamp*
+            * :param keys: [list] - a list of field names
+            * :param timestamp: [int|str] - the historical timestamp to use in the lookup
+            * :returns a dict associating each key to a dict associating each value to the list of records that
+                       contained that value in the *key* field at *timestamp*
         """
         keys = keys or kwargs.get('key')
         timestamp = timestamp or find_in_kwargs_by_alias('timestamp', kwargs)
@@ -323,13 +353,33 @@ class Concourse(object):
         return pythonify(data)
 
     def chronologize(self, key, record, start=None, end=None, **kwargs):
-        """ Return a chronological view that shows the state of a field (key/record) over a range of time.
+        """ View a time series with snapshots of a _field_ after every change.
 
-        :param key: string
-        :param record: int
-        :param start: string|int (optional)
-        :param end: string|int (optional)
-        :return: the chronological view of the field over the specified (or entire) range of time
+        Options:
+        -------
+        * `chronologize(key, record)` - View a time series that associates the timestamp of each modification for _key_
+            in _record_ to a snapshot containing the values that were stored in the field after the change.
+            * :param key: [str] - the field name
+            * :param record: [int] - the record id
+            * :returns a dict associating each modification timestamp to the list of values that were stored in the
+            field after the change
+        * `chronologize(key, record, start)` - View a time series between _start_ (inclusive) and the present that
+            associates the timestamp of each modification for _key_ in _record_ to a snapshot containing the values that
+            were stored in the field after the change.
+            * :param key: [str] - the field name
+            * :param record: [int] - the record id
+            * :param start [int|str] - the first possible timestamp to include in the time series
+            * :returns a dict associating each modification timestamp to the list of values that were stored in the
+            field after the change.
+        * `chronologize(key, record, start, end)` - View a time series between _start_ (inclusive) and _end_
+            (non-inclusive) that associates the timestamp of each modification for _key_ in _record_ to a snapshot
+            containing the values that were stored in the field after the change.
+            * :param key: [str] - the field name
+            * :param record: [int] - the record id
+            * :param start [int|str] - the first possible timestamp to include in the time series
+            * :param end [int|str] - the timestamp that should be greater than every timestamp in the time series
+            * :returns a dict associating each modification timestamp to the list of values that were stored in the
+            field after the change.
         """
         start = start or find_in_kwargs_by_alias('timestamp', kwargs)
         startstr = isinstance(start, str)
@@ -352,10 +402,27 @@ class Concourse(object):
         return pythonify(data)
 
     def clear(self, keys=None, records=None, **kwargs):
-        """ Atomically remove all the data from a field or an entire record.
+        """ Atomically remove all the values from one or more _fields_.
 
-        :param key: string or keys: list
-        :param record: int or records list
+        Options:
+        -------
+        * `clear(record)` - Atomically remove all the values stored for every key in _record_.
+            * :param record: [int] - the record id
+        * `clear(records)` - Atomically remove all the values stored for every key in each of the _records_.
+            * :param records: [list] - the list of record ids
+        * `clear(key, record)` - Atomically remove all the values stored for _key_ in _record_.
+            * :param key: [str] - the field name
+            * :param record: [int] - the record id
+        * `clear(keys, record)` - Atomically remove all the values stored for each of the _keys_ in _record_.
+            * :param keys: [list] - the list of field names
+            * :param record: [int] - the record id
+        * `clear(key, records)` - Atomically remove all the values stored for _key_ in each of the _records_.
+            * :param key: [str] - the field name
+            * :param records: [list] - the list of record ids
+        * `clear(keys, records)` - Atomically remove all the values stored for each of the _keys_ in each of the
+                _records_.
+            * :param keys: [list] - the list of field names
+            * :param records: [list] - the list of record ids
         """
         keys = keys or kwargs.get('key')
         records = records or kwargs.get('record')
@@ -374,10 +441,21 @@ class Concourse(object):
         else:
             require_kwarg('record or records')
 
-    def commit(self):
-        """ Commit the currently running transaction.
+    def close(self):
+        """ An alias for the exit method.
+        """
+        self.exit()
 
-        :return: True if the transaction commits. Otherwise, False.
+    def commit(self):
+        """ Attempt to permanently commit any changes that are staged in a transaction and return _True_ if and only if
+        all the changes can be applied. Otherwise, returns _False_ and all the changes are discarded.
+
+        After returning, the driver will return to _autocommit_ mode and all subsequent changes will be committed
+        immediately.
+
+        This method will return _false_ if it is called when the driver is not in _staging_ mode.
+
+        :return: _True_ if all staged changes are committed, otherwise _False_
         """
         token = self.transaction
         self.transaction = None
@@ -387,12 +465,25 @@ class Concourse(object):
             return False
 
     def describe(self, records=None, timestamp=None, **kwargs):
-        """ Return all keys in a record at the present or the specified timestamp.
+        """ For one or more _records_, list all the _keys_ that have at least one value.
 
-        :param record (int) or records (list)
-        :param timestamp: string|int (optional)
-        :return: a set of keys if a single record if provided, if multiple records are provided, a mapping from the
-        record to a set of keys
+        Options:
+        -------
+        * `describe(record)` - List all the keys in _record_ that have at least one value.
+            * :param record: [int] - the record id
+            * :returns the list of keys in _record_
+        * `describe(record, timestamp)` - List all the keys in _record_ that had at least one value at _timestamp_.
+            * :param record: [int] - the record id
+            * :param timestamp [int|str] - the historical timestamp to use in the lookup
+            * :returns the list of keys that were in _record_ at _timestamp_
+        * `describe(records)` - For each of the _records_, list all of the keys that have at least one value.
+            * :param records: [list] - a list of record ids
+            * :returns a dict associating each record id to the list of keys in that record
+        * `describe(records, timestamp)` - For each of the _records_, list all the keys that had at least one value at
+            _timestamp_.
+            * :param records: [list] - a list of record ids
+            * :param timestamp [int|str] - the historical timestamp to use in the lookup
+            * :returns a dict associating each record id to the list of keys that were in that record at _timestamp_
         """
         timestamp = timestamp or find_in_kwargs_by_alias('timestamp', kwargs)
         timestr = isinstance(timestamp, str)
@@ -412,13 +503,61 @@ class Concourse(object):
         return pythonify(data)
 
     def diff(self, key=None, record=None, start=None, end=None, **kwargs):
-        """ Return the differences in a field, record of index from a start timestamp to an end timestamp.
+        """ List the net changes made to a _field_, _record_ or _index_ from one timestamp to another.
 
-        :param key:
-        :param record:
-        :param start:
-        :param end:
-        :return:
+        Options:
+        -------
+        * `diff(record, start)` - List the net changes made to _record_ since _start_. If you begin with
+            the state of the _record_ at _start_ and re-apply all the changes in the diff, you'll re-create
+            the state of the same _record_ at the present.
+            * :param record: [int] - the record id
+            * :param start [int|str] - the base timestamp from which the diff is calculated
+            * :returns a dict that associates each key in the _record_ to another dict that associates a change
+                description (see Diff) to the list of values that fit the description
+                (i.e. `{"key": {ADDED: ["value1", "value2"], REMOVED: ["value3", "value4"]}}`)
+        * `diff(record, start, end)` - List the net changes made to _record_ from _start_ to _end_. If you begin
+            with the state of the same _record_ at _start_ and re-apply all the changes in the diff, you'll re-create
+            the state of the _record_ at _end_.
+            * :param record: [int] - the record id
+            * :param start [int|str] - the base timestamp from which the diff is calculated
+            * :param end [int|str] - the comparison timestamp to which the diff is calculated
+            * :returns a dict that associates each key in the _record_ to another dict that associates a change
+                description (see Diff) to the list of values that fit the description
+                (i.e. `{"key": {ADDED: ["value1", "value2"], REMOVED: ["value3", "value4"]}}`)
+        * `diff(key, record, start)` - List the net changes made to _key_ in _record_ since _start_. If you begin
+            with the state of the field at _start_ and re-apply all the changes in the diff, you'll re-create the state
+            of the same field at the present.
+            * :param key: [str] - the field name
+            * :param record: [int] - the record id
+            * :param start [int|str] - the base timestamp from which the diff is calculated
+            * :returns dict that associates a change description (see Diff) to the list of values that fit
+                the description (i.e. `{ADDED: ["value1", "value2"], REMOVED: ["value3", "value4"]}`)
+        * `diff(key, record, start, end)` - List the next changes made to _key_ in _record_ from _start_ to _end_.
+            If you begin with the sate of the field at _start_ and re-apply all the changes in the diff, you'll
+            re-create the state of the same field at _end_.
+            * :param key: [str] - the field name
+            * :param record: [int] - the record id
+            * :param start [int|str] - the base timestamp from which the diff is calculated
+            * :param end [int|str] - the comparison timestamp to which the diff is calculated
+            * :returns dict that associates a change description (see Diff) to the list of values that fit
+                the description (i.e. `{ADDED: ["value1", "value2"], REMOVED: ["value3", "value4"]}`)
+        * `diff(key, start)` - List the net changes made to the _key_ field across all records since _start_. If you
+            begin with the state of the inverted index for _key_ at _start_ and re-apply all the changes in the diff,
+            you'll re-create the state of the same index at the present.
+            * :param key: [str] - the field name
+            * :param start [int|str] - the base timestamp from which the diff is calculated
+            * :returns a dict that associates each value stored for _key_ across all records to another dict that
+                associates a change description (see Diff) to the list of records where the description applies to
+                that value in the _key_ field (i.e. `{"value1": {ADDED: [1, 2], REMOVED: [3, 4]}}`)
+        * `diff(key, start, end)` - List the net changes made to the _key_ field across all records from _start_ to
+            _end_. If you begin with the state of the inverted index for _key_ at _start_ and re-apply all the changes
+            in the diff, you'll re-create the state of the same index at _end_.
+            * :param key: [str] - the field name
+            * :param start [int|str] - the base timestamp from which the diff is calculated
+            * :param end [int|str] - the comparison timestamp to which the diff is calculated
+            * :returns a dict that associates each value stored for _key_ across all records to another dict that
+                associates a change description (see Diff) to the list of records where the description applies to
+                that value in the _key_ field (i.e. `{"value1": {ADDED: [1, 2], REMOVED: [3, 4]}}`)
         """
         start = start or find_in_kwargs_by_alias('timestamp', kwargs)
         startstr = isinstance(start, str)
@@ -454,13 +593,8 @@ class Concourse(object):
             require_kwarg('start and (record or key)')
         return pythonify(data)
 
-    def close(self):
-        """ Close the connection.
-        """
-        self.exit()
-
     def exit(self):
-        """ Close the connection.
+        """ Terminate the client's session and close this connection.
         """
         self.client.logout(self.creds, self.environment)
         self.transport.close()
@@ -525,7 +659,7 @@ class Concourse(object):
         """
         data = data or kwargs.get('json')
         if isinstance(data, dict) or isinstance(data, list):
-            data = ujson.dumps(data)
+            data = json_encode(data)
         criteria = criteria or find_in_kwargs_by_alias('criteria', kwargs)
         return self.client.findOrInsertCclJson(criteria, data, self.creds, self.transaction, self.environment)
 
@@ -658,7 +792,7 @@ class Concourse(object):
         data = data or kwargs.get('json')
         records = records or kwargs.get('record')
         if isinstance(data, dict) or isinstance(data, list):
-            data = ujson.dumps(data)
+            data = json_encode(data)
 
         if isinstance(records, list):
             result = self.client.insertJsonRecords(data, records, self.creds, self.transaction, self.environment)

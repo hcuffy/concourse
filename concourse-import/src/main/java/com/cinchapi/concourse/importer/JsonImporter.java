@@ -17,6 +17,8 @@ package com.cinchapi.concourse.importer;
 
 import java.util.Set;
 
+import org.slf4j.Logger;
+
 import com.cinchapi.concourse.Concourse;
 import com.cinchapi.concourse.Constants;
 import com.cinchapi.concourse.time.Time;
@@ -27,8 +29,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.gson.JsonObject;
-
-import ch.qos.logback.classic.Logger;
 
 /**
  * An {@link Importer} that uses Concourse's {@link Concourse#insert(String)
@@ -42,7 +42,13 @@ import ch.qos.logback.classic.Logger;
  * 
  * @author Jeff Nelson
  */
+<<<<<<< HEAD
 public class JsonImporter extends Importer<JsonObject> {
+=======
+public class JsonImporter extends Importer {
+    
+    protected final Logger log;
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
 
     /**
      * Construct a new instance.
@@ -50,22 +56,13 @@ public class JsonImporter extends Importer<JsonObject> {
      * @param concourse
      */
     protected JsonImporter(Concourse concourse, Logger log) {
-        super(concourse, log);
-    }
-
-    /**
-     * Construct a new instance.
-     * 
-     * @param concourse
-     */
-    protected JsonImporter(Concourse concourse) {
         super(concourse);
+        this.log = log;
     }
 
     @Override
     public Set<Long> importFile(String file) {
-        String json = FileOps.read(file);
-        return upsertJsonString(json);
+        return importString(FileOps.read(file));
     }
 
     /**
@@ -105,9 +102,14 @@ public class JsonImporter extends Importer<JsonObject> {
     }
 
     @Override
+<<<<<<< HEAD
     protected void validateFileFormat(JsonObject object)
             throws IllegalArgumentException {
 
+=======
+    public Set<Long> importString(String json) {
+        return concourse.insert(json);
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
     }
 
 }

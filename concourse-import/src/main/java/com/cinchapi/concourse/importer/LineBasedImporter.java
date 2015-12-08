@@ -21,6 +21,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
 
 import com.cinchapi.concourse.Concourse;
 import com.cinchapi.concourse.Constants;
@@ -36,8 +37,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 
-import ch.qos.logback.classic.Logger;
-
 /**
  * An {@link Importer} that handles data from a file that can be delimited into
  * one or more lines. Each line is considered a single group of data that can be
@@ -45,6 +44,7 @@ import ch.qos.logback.classic.Logger;
  * 
  * @author Jeff Nelson
  */
+@Deprecated
 public abstract class LineBasedImporter extends JsonImporter {
 
     /**
@@ -52,16 +52,6 @@ public abstract class LineBasedImporter extends JsonImporter {
      * path that takes advantage of the {@link QuoteAwareStringSplitter}.
      */
     protected boolean useOptimizedSplitPath = true; // visible for testing
-
-    /**
-     * Construct a new instance.
-     * 
-     * @param concourse
-     */
-    protected LineBasedImporter(Concourse concourse) {
-        super(concourse);
-        useOptimizedSplitPath = delimiter().length() == 1;
-    }
 
     /**
      * Construct a new instance.
@@ -100,17 +90,20 @@ public abstract class LineBasedImporter extends JsonImporter {
         List<String> lines = FileOps.readLines(file);
         String[] keys = header();
         JsonArray array = new JsonArray();
+<<<<<<< HEAD
         boolean upsert = false;
+=======
+        boolean checkedFileFormat = false;
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
         for (String line : lines) {
             if(keys == null) {
                 keys = parseKeys(line);
-                log.info("Parsed keys from header: " + line);
+                 log.info("Parsed keys from header: " + line);
             }
             else {
                 JsonObject object = parseLine(line, keys);
                 validateFileFormat(object);
                 if(resolveKey != null && object.has(resolveKey)) {
-                    upsert = true;
                     JsonElement resolveValue = object.get(resolveKey);
                     if(!resolveValue.isJsonArray()) {
                         JsonArray temp = new JsonArray();
@@ -140,19 +133,18 @@ public abstract class LineBasedImporter extends JsonImporter {
                 else {
                     array.add(object);
                 }
-                log.info("Importing {}", line);
+                 log.info("Importing {}", line);
             }
 
         }
-        Set<Long> records = upsert ? upsertJsonString(array.toString())
-                : importJsonString(array.toString());
+        Set<Long> records = importString(array.toString());
         return records;
     }
 
     /**
      * The delimiter that is used to split fields on each line.
      * 
-     * @return
+     * @return the delimiter
      */
     protected abstract String delimiter();
 
@@ -179,8 +171,12 @@ public abstract class LineBasedImporter extends JsonImporter {
      * be used by subclasses to define dynamic intermediary transformations to
      * data to better prepare it for import.
      * </p>
+<<<<<<< HEAD
      * <h1>Examples</h1>
      * <h2>Specifying Link Resolution</h2>
+=======
+     * <h1>Examples</h1> <h2>Specifying Link Resolution</h2>
+>>>>>>> c50f069728b15c45ff1bb78c8203a8b3d8fab8ff
      * <p>
      * The server will convert raw data of the form
      * <code>@&lt;key&gt;@value@&lt;key&gt;@</code> into a Link to all the
@@ -218,6 +214,7 @@ public abstract class LineBasedImporter extends JsonImporter {
         }
         else {
             element = new JsonPrimitive(value);
+            element.toString();
         }
         return element;
     }

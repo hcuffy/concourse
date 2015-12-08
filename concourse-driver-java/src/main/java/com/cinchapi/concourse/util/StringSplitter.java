@@ -16,10 +16,10 @@
 package com.cinchapi.concourse.util;
 
 import java.util.NoSuchElementException;
+import static com.cinchapi.concourse.util.SplitOption.*;
 
 /**
- * A utility to traverse and split a string into {@link Substring substrings}
- * in-place.
+ * An in-place utility to traverse and split a string into substring.
  * <p>
  * Unlike the {@link String#split(String)} method, this utility returns tokens
  * as they are split on the fly so the caller can process them in place. The
@@ -45,6 +45,16 @@ import java.util.NoSuchElementException;
 public class StringSplitter {
 
     /**
+     * An integer that contains bits representing {@link SplitOption split
+     * options} that have been enabled. To check whether an option is enabled do
+     * 
+     * <pre>
+     * return (options &amp; (1 &lt;&lt; option.mask())) != 0;
+     * </pre>
+     */
+    protected final int options;
+
+    /**
      * The char array of the string that is being split.
      */
     private char[] chars;
@@ -55,9 +65,48 @@ public class StringSplitter {
     private final char delimiter;
 
     /**
+     * A flag that controls whether an attempt to split on a newline character
+     * sequence should ignore the line feed character ('\n') because the
+     * previous character was a carriage return (\r). Typically, a sequence of
+     * \r\n is used by Windows to signify a newline.
+     * 
+     * <p>
+     * This flag is only relevant if the option to {@link #splitOnNewline()} is
+     * enabled.
+     * </p>
+     */
+    private boolean ignoreLF = false;
+
+    /**
+     * A flag that is set in the {@link #findNext()} method whenever it
+     * determines that the {@link #next} token to be returned is at the end of
+     * line.
+     */
+    private boolean nextEOL = false;
+
+    /**
+     * A flag that is set in the {@link #next()} method whenever it grabs a
+     * {@link #next} token that was determined to be at the end of line. This
+     * means that calls to {@link #atEndOfLine()} will return {@code true} until
+     * the next call to {@link #next()}.
+     */
+    private boolean lastEOL = false;
+
+    /**
      * The next string to return.
      */
     private String next = null;
+
+    /**
+     * A flag that controls whether we should allow {@link #findNext()} to set
+     * {@link #next} to an empty string. Normally, whenever two delimiters
+     * appear back to back, the splitter will return an empty string (i.e.
+     * "foo,,bar,car" means that there is an empty token in the 2nd column).
+     * However, when additional {@link #options} are passed to the splitter, it
+     * may be unintuitive to return an empty string when we a character that is
+     * relevant for one of the options and the delimiter appear back-to-back.
+     */
+    private boolean overrideEmptyNext = false;
 
     /**
      * The current position of the splitter.
@@ -72,7 +121,7 @@ public class StringSplitter {
     /**
      * Construct a new instance.
      * 
-     * @param string
+     * @param string the string to split
      */
     public StringSplitter(String string) {
         this(string, ' ');
@@ -81,13 +130,41 @@ public class StringSplitter {
     /**
      * Construct a new instance.
      * 
-     * @param string
-     * @param delimiter
+     * @param string the string to split
+     * @param delimiter the delimiter upon which to split
      */
     public StringSplitter(String string, char delimiter) {
+        this(string, delimiter, SplitOption.NONE);
+    }
+
+    /**
+     * Construct a new instance.
+     * 
+     * @param string the string to split
+     * @param delimiter the delimiter upon which to split
+     * @param options an array of {@link SplitOption options} to supplement the
+     *            split behaviour
+     */
+    public StringSplitter(String string, char delimiter, SplitOption... options) {
         this.chars = string.toCharArray();
         this.delimiter = delimiter;
+        int opts = 0;
+        for (SplitOption option : options) {
+            opts |= 1 << option.mask();
+        }
+        this.options = opts;
         findNext();
+    }
+
+    /**
+     * Construct a new instance.
+     * 
+     * @param string the string to split
+     * @param options an array of {@link SplitOption options} to supplement the
+     *            split behaviour
+     */
+    public StringSplitter(String string, SplitOption... options) {
+        this(string, ' ', options);
     }
 
     /**
@@ -97,6 +174,18 @@ public class StringSplitter {
      */
     public boolean hasNext() {
         return next != null;
+    }
+
+    /**
+     * Return {@code true} if {@link SplitOption#SPLIT_ON_NEWLINE} is
+     * {@link SplitOption#isEnabled(StringSplitter) enabled} and the last token
+     * returned by {@link #next()} is followed immediately by a line break.
+     * Otherwise, return {@code false}.
+     * 
+     * @return {@code true} if the last token returned was at the end of line
+     */
+    public boolean atEndOfLine() {
+        return lastEOL;
     }
 
     /**
@@ -111,6 +200,13 @@ public class StringSplitter {
         }
         else {
             String result = next;
+            if(lastEOL) {
+                lastEOL = false;
+            }
+            if(nextEOL) {
+                lastEOL = true;
+                nextEOL = false;
+            }
             findNext();
             return result;
         }
@@ -151,22 +247,55 @@ public class StringSplitter {
      * Find the next element to return.
      */
     private void findNext() {
+        nextEOL = false;
         next = null;
+        boolean resetOverrideEmptyNext = true;
+        boolean processOverrideEmptyNext = true;
         while (pos < chars.length && next == null) {
+            boolean resetIgnoreLF = true;
             char c = chars[pos];
             ++pos;
             if(c == delimiter && isReadyToSplit()) {
-                int length = pos - start - 1;
-                if(length == 0) {
-                    next = "";
+                setNext();
+            }
+            else if(SPLIT_ON_NEWLINE.isEnabled(this) && c == '\n'
+                    && isReadyToSplit()) {
+                if(ignoreLF) {
+                    start = pos;
                 }
                 else {
-                    next = String.valueOf(chars, start, length);
+                    setNext();
+                    nextEOL = true;
                 }
-                start = pos;
             }
+            else if(SPLIT_ON_NEWLINE.isEnabled(this) && c == '\r'
+                    && isReadyToSplit()) {
+                ignoreLF = true;
+                resetIgnoreLF = false;
+                setNext();
+                nextEOL = true;
+            }
+            else if(TOKENIZE_PARENTHESIS.isEnabled(this)
+                    && (c == '(' || c == ')') && isReadyToSplit()) {
+                setNext();
+                if(next.isEmpty()) {
+                    next = Strings.valueOfCached(c);
+                    overrideEmptyNext = true;
+                    processOverrideEmptyNext = false;
+                    resetOverrideEmptyNext = false;
+                }
+                else {
+                    // Need to undo the modifications from #setNext() in order
+                    // to look at the parenthesis char again so it can be
+                    // returned as a single token via the if block above
+                    pos--;
+                    start = pos;
+                }
+            }
+            // For SPLIT_ON_NEWLINE, we must reset #ignoreLF if the current char
+            // is not == '\r'
+            ignoreLF = resetIgnoreLF ? false : ignoreLF;
             updateIsReadyToSplit(c);
-
         }
         if(pos == chars.length && next == null) { // If we reach the end of the
                                                   // string without finding
@@ -195,6 +324,42 @@ public class StringSplitter {
             }
             next = atEnd ? null : next;
         }
+        // FOR TOKENIZE_PARENTHESIS, we must #overrideEmptyNext if the last
+        // next was a single parenthesis in case the next char is a delimiter.
+        // This prevents the appearance of having back-to-back delimiters.
+        if(overrideEmptyNext && processOverrideEmptyNext) {
+            if(next != null && next.isEmpty()) {
+                findNext();
+            }
+            resetOverrideEmptyNext = true;
+        }
+        overrideEmptyNext = resetOverrideEmptyNext ? false : overrideEmptyNext;
+    }
+
+    /**
+     * Set the {@link #next} element based on the current {@link #pos} and the
+     * {@link #start} of the search.
+     * <p>
+     * The side effects of this method are:
+     * <ul>
+     * <li>{@code next} is set equal to all the chars from {@link #start} and
+     * {@link #pos} - 2</li>
+     * <li>{@code start} is set equal to {@link #pos}</li>
+     * </li>The char at {@link #pos} - 1 is "dropped". This character is usually
+     * the delimiter, so it is okay to do this, but if there is a corner case,
+     * the caller must explicitly handle that character
+     * </ul>
+     * </p>
+     */
+    private void setNext() {
+        int length = pos - start - 1;
+        if(length == 0) {
+            next = "";
+        }
+        else {
+            next = String.valueOf(chars, start, length);
+        }
+        start = pos;
     }
 
 }
